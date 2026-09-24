@@ -18,19 +18,16 @@
           <div class="logo-badge">VelocityBench Hub</div>
         </div>
       </div>
-      <div class="header-actions">
-        <button class="icon-btn hidden" id="menuBtn" type="button" aria-label="Menu" title="Menu">☰</button>
+      <div class="header-actions" id="headerActions">
+        <button class="btn board-only hidden" type="button" id="openAnotherBtn">Open another file</button>
+        <button class="btn board-only hidden" type="button" id="chooseExportBtn">Choose export copy</button>
+        <button class="btn board-only fleet-only hidden" type="button" id="remapBtn">Match columns</button>
+        <button class="btn board-only fleet-only hidden" type="button" id="useGenericBtn">Use generic layout</button>
+        <button class="btn board-only generic-only hidden" type="button" id="colsBtn">Columns</button>
+        <button class="btn board-only generic-only fleet-available-only hidden" type="button" id="useFleetBtn">Use Fleet layout</button>
+        <button class="btn board-only hidden" type="button" id="exportViewBtn">Export view CSV</button>
       </div>
     </header>
-
-    <div class="menu hidden" id="menu">
-      <button type="button" id="remapBtn" class="fleet-only hidden">Match columns</button>
-      <button type="button" id="colsBtn" class="generic-only hidden">Show / hide columns</button>
-      <button type="button" id="useGenericBtn" class="fleet-only hidden">Use generic layout</button>
-      <button type="button" id="useFleetBtn" class="generic-only hidden">Use Fleet layout</button>
-      <button type="button" id="chooseOtherBtn">Open another file</button>
-      <button type="button" id="chooseExportBtn">Choose export copy</button>
-    </div>
 
     <div id="lockBanner" class="banner lock hidden" role="alert">
       <div class="banner-text">
@@ -50,6 +47,17 @@
       </div>
       <div class="banner-actions">
         <button class="btn btn-primary" type="button" id="fsaRepickBtn">Choose workbook again</button>
+      </div>
+    </div>
+
+    <div id="restoreHint" class="banner warn hidden" role="status">
+      <div class="banner-text">
+        <strong>Welcome back.</strong>
+        <span id="restoreHintText">A previous workbook was remembered on this device. Choose it again to restore your view.</span>
+      </div>
+      <div class="banner-actions">
+        <button class="btn btn-primary" type="button" id="restoreRepickBtn">Choose workbook</button>
+        <button class="btn" type="button" id="restoreDismissBtn">Dismiss</button>
       </div>
     </div>
 
@@ -105,7 +113,6 @@
             Auto-check
           </label>
           <button class="btn" type="button" id="refreshBtnGeneric">Refresh</button>
-          <button class="btn btn-ghost" type="button" id="colsBoardBtn">Columns</button>
         </div>
       </div>
 
@@ -115,6 +122,7 @@
       </div>
 
       <div class="kpis" id="kpisGeneric"></div>
+      <div class="date-horizons" id="dateHorizons"></div>
       <div class="cat-chips" id="catChips"></div>
 
       <div class="panel">
@@ -148,14 +156,12 @@
             Auto-check
           </label>
           <button class="btn" type="button" id="refreshBtnFleet">Refresh</button>
-          <button class="btn btn-ghost" type="button" id="remapBoardBtn">Match columns</button>
         </div>
       </div>
 
       <div class="mode-pill">
         <span class="pill accent">Fleet layout</span>
         <span class="pill-hint">90-day inspection queue · status filters</span>
-        <button class="btn btn-ghost btn-sm" type="button" id="switchGenericFromFleet">Switch to generic</button>
       </div>
 
       <div class="kpis" id="kpis"></div>

@@ -963,3 +963,111 @@ th.sortable:hover {
 @media (max-width: 900px) {
   #kpisGeneric { grid-template-columns: 1fr 1fr; }
 }
+
+/* ── Phase 3: header actions (no hamburger) ── */
+.header {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+.header-actions .btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.header-actions .btn.active {
+  border-color: rgba(76, 201, 240, 0.55);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+/* Date horizon filters (generic — any date column) */
+.date-horizons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.horizon-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.horizon-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-right: 4px;
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.horizon-chip {
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.horizon-chip:hover {
+  border-color: rgba(76, 201, 240, 0.45);
+}
+
+.horizon-chip.active {
+  border-color: rgba(76, 201, 240, 0.55);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.cat-chip.active {
+  border: 1px solid rgba(76, 201, 240, 0.55);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.kpi[role="button"],
+.kpi.clickable {
+  cursor: pointer;
+}
+
+.kpi.active {
+  border-color: rgba(76, 201, 240, 0.55);
+  box-shadow: 0 0 0 1px rgba(76, 201, 240, 0.25);
+}
+
+.filter-clear-hint {
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-left: 4px;
+}
+
+@media (max-width: 720px) {
+  .header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}

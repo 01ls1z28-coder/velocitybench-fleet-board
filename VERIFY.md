@@ -1,39 +1,42 @@
-# Dashboard — VERIFY (Phase 2)
+# Dashboard — VERIFY (Phase 3)
 
 ## Tip
 
-- **SHA (full):** `95ff0b823a4499177410b54d649fb75a656a3411`
-- **Branch:** `review/fleet-board-phase2`
+- **SHA (full):** `TIP_SHA_PLACEHOLDER`
+- **Branch:** `review/dashboard-phase3`
+- **Branch URL:** https://github.com/01ls1z28-coder/velocitybench-fleet-board/tree/review/dashboard-phase3
 - **Repo:** https://github.com/01ls1z28-coder/velocitybench-fleet-board
 - **Pages (after review CLEAR / deploy):** https://01ls1z28-coder.github.io/velocitybench-fleet-board/
-- **Do not treat main as live** until review CLEAR. Phase 2 is review-branch only.
+- **Do not treat main as live** until review CLEAR. Phase 3 is review-branch only.
 
-## Feature checklist
+## Must-ship checklist
+
+| # | Item | Status |
+|---|------|--------|
+| 1 | **Header buttons** replace ☰ — `#menuBtn` / `#menu` removed; context-aware actions in `.header-actions` (Open another file, Choose export copy; Fleet: Match columns + Use generic layout; Generic: Columns + Use Fleet layout when fleet headers; Export view CSV). Refresh / Auto-check stay in file bar. Narrow: wrap/scroll, never hide behind ☰. | Yes (`index.html`, `css/styles.css`, `js/app.js`) |
+| 2 | **Remember last workbook + view** — restore FSA handle when permitted; else gentle `#restoreHint` prompt. Per-workbook fingerprint (`name\|size\|lastModified`): layout mode, sheet, column visibility, sort, filters (localStorage / IndexedDB only). | Yes (`js/app.js`, `js/generic.js`, `js/fleet.js`) |
+| 3 | **Click-to-filter** — Generic: KPI cards + category chips toggle filters (click again clears; multi-select chips). Fleet: KPI cards filter queue + table (overdue / 7d / 30d / all); click again clears. | Yes |
+| 4 | **Date horizons** on any detected date column (generic): Overdue / Next 7d / Next 30d / All. | Yes (`#dateHorizons` in `js/generic.js`) |
+| 5 | **Export current view** — CSV of visible/filtered rows × visible columns only; client-side download. | Yes (`exportViewBtn` → `exportCurrentView`) |
+
+## Kept from prior phases
 
 | Item | Status |
 |------|--------|
-| FSA path (`showOpenFilePicker` → handle → Refresh via `getFile()`) | Yes (`js/app.js`) |
-| IndexedDB persist of handle (`fleetboard-fsa-v1`) + query/requestPermission | Yes |
-| Auto-check toggle default ON; poll ~4s while visible; pause when hidden | Yes |
-| Fallback `<input type=file>` + drag-drop; Refresh re-prompts | Yes |
-| Excel lock banner + Retry + Choose export copy | Yes |
-| **Generic mode DEFAULT:** sheet picker, header row → columns, type infer (`number`/`date`/`text`/`category`) | Yes (`js/generic.js`) |
-| Auto KPIs: row count; numeric sum/avg/min/max (≤4); date overdue/≤7d/≤30d; category top chips | Yes |
-| Searchable table + sortable headers + column show/hide (`localStorage` by header hash) | Yes |
-| **Fleet layout preset:** detect Unit#/Reg.Exp/90-day → CTA “Use Fleet layout”; v1 KPIs/queue/drawer/mapper kept | Yes (`js/fleet.js`) |
-| Default remains Generic until user opts in; choice remembered | Yes |
-| Hub brass/dark chrome | Yes |
+| FSA + Refresh + lastModified Auto-check | Yes |
+| Excel lock banner + Choose export copy | Yes |
+| Privacy: IndexedDB / localStorage only, never upload | Yes |
+| Generic default; Fleet optional preset | Yes |
 | Credits: **Created by Jorge Guerra** only | Yes |
-| No upload / no backend | Yes |
-| Vendored SheetJS + `sample-fleet.xlsx` + `sample-orders.xlsx` | Yes |
-| HOW-TO: Chrome/Edge, any workbook, Refresh after Excel Save, fleet preset note | Yes |
+| Hub untouched this tip | Yes (this repo only) |
+| Static Pages; `sample-fleet.xlsx` + `sample-orders.xlsx` kept | Yes |
 
 ## Screenshots (on box)
 
-- `/workspace/fleet-board-phase2-generic.png` — generic mode on `sample-orders.xlsx` (auto KPIs + typed table)
-- `/workspace/fleet-board-phase2-fleet.png` — fleet preset on `sample-fleet.xlsx` (queue + KPIs)
+- `/workspace/dashboard-phase3-header.png` — Fleet layout; header buttons (Open another / Choose export / Match columns / Use generic / Export view CSV); overdue KPI active filtering queue + table
+- `/workspace/dashboard-phase3-generic.png` — Generic on `sample-orders.xlsx`; date horizons (Order Date / Due Date); category chip filter; Export view CSV + Columns in header
 
-**Note:** Playwright automation loads via `<input type=file>` (FSA needs a real user gesture / native picker). Screenshots show fallback-mode banner; FSA path is exercised manually in Chrome/Edge. Smoke: generic Orders → 10 rows, Amount/Due date KPIs, category chips; fleet sample → Units **8**, 90-day overdue **2**, Due in 7 days **1**, Due in 30 days **3**. Footer credit Jorge Guerra.
+**Note:** Playwright loads via `<input type=file>` (FSA needs a real user gesture). Screenshots show fallback-mode banner; FSA path is exercised manually in Chrome/Edge.
 
 ## Smoke
 
@@ -41,11 +44,13 @@
 cd /workspace/velocitybench-fleet-board
 python3 -m http.server 8899 --bind 127.0.0.1
 # open http://127.0.0.1:8899/ — Chrome preferred for FSA
-# Choose sample-orders.xlsx (generic) or sample-fleet.xlsx (accept Fleet layout CTA)
+# sample-orders.xlsx → generic horizons / chips / Export view CSV
+# sample-fleet.xlsx → accept Fleet → header Match columns / KPI click-to-filter
 ```
 
-## Credit / privacy checks
+## Credit / privacy / rg
 
 - Footer and README credit **Created by Jorge Guerra** only.
-- No builder/agent display names in HTML, README, HOW-TO, or shipped comments.
-- Privacy disclaimer in footer: data stays in this browser / never uploaded.
+- No Sati / Seraph / Merovingian / builder display names in shipped UI or docs.
+- No `#menuBtn` / `#menu` hamburger left.
+- Privacy disclaimer: data stays in this browser / never uploaded.

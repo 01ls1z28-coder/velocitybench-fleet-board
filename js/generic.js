@@ -1,9 +1,10 @@
-/* Generic Excel dashboard — header-driven types + auto KPIs */
+/* Generic Excel dashboard — header-driven types + auto KPIs + Phase 3 filters */
 (function (global) {
   "use strict";
 
   const COLS_KEY_PREFIX = "fleetboard-cols-v1:";
   const MODE_KEY_PREFIX = "fleetboard-mode-v1:";
+  const VIEW_KEY_PREFIX = "dashboard-view-v1:";
 
   const $ = (id) => document.getElementById(id);
 
@@ -35,7 +36,6 @@
     if (v instanceof Date && !isNaN(v)) return v;
     const s = String(v).trim();
     if (!s) return null;
-    /* Avoid treating bare numbers / years as dates */
     if (/^\d+(\.\d+)?$/.test(s) && Number(s) < 100000) return null;
     const d = new Date(s);
     if (isNaN(d)) return null;
@@ -115,6 +115,12 @@
     return n.toLocaleString(undefined, { maximumFractionDigits: 2 });
   }
 
+  function csvEscape(v) {
+    const s = v == null ? "" : String(v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
+  }
+
   function create(api) {
     const state = {
       cols: [],
@@ -122,7 +128,14 @@
       search: "",
       sortKey: "",
       sortDir: 1,
-      hash: ""
+      hash: "",
+      /* category multi-select: { colHeader: Set(values) } */
+      catFilters: {},
+      /* date horizons: { colHeader: "overdue"|"7d"|"30d"|"all"|"" } */
+      dateFilters: {},
+      /* KPI filter id when active (e.g. date-Due date:overdue) */
+      kpiFilter: "",
+      fingerprint: ""
     };
 
     function loadVisiblePrefs(hash, headers) {
@@ -148,21 +161,192 @@
       try {
         localStorage.setItem(COLS_KEY_PREFIX + state.hash, JSON.stringify(state.visible));
       } catch (_) { /* ignore */ }
+      persistView();
+    }
+
+    function viewStorageKey() {
+      const fp = state.fingerprint || state.hash;
+      if (!fp) return null;
+      return VIEW_KEY_PREFIX + fp;
+    }
+
+    function persistView() {
+      const key = viewStorageKey();
+      if (!key) return;
+      const catObj = {};
+      Object.keys(state.catFilters).forEach((col) => {
+        const set = state.catFilters[col];
+        if (set && set.size) catObj[col] = Array.from(set);
+      });
+      try {
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            layoutMode: "generic",
+            sheet: api.getSheet ? api.getSheet() : "",
+            visible: state.visible,
+            sortKey: state.sortKey,
+            sortDir: state.sortDir,
+            search: state.search,
+            catFilters: catObj,
+            dateFilters: state.dateFilters,
+            kpiFilter: state.kpiFilter
+          })
+        );
+      } catch (_) { /* ignore */ }
+    }
+
+    function restoreViewPrefs() {
+      const key = viewStorageKey();
+      if (!key) return;
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (saved.visible && typeof saved.visible === "object") {
+          const headers = api.getHeaders();
+          headers.forEach((h) => {
+            if (saved.visible[h] === false) state.visible[h] = false;
+            else if (saved.visible[h] === true) state.visible[h] = true;
+          });
+        }
+        if (saved.sortKey) state.sortKey = saved.sortKey;
+        if (saved.sortDir === 1 || saved.sortDir === -1) state.sortDir = saved.sortDir;
+        if (typeof saved.search === "string") {
+          state.search = saved.search;
+          if ($("searchGeneric")) $("searchGeneric").value = state.search;
+        }
+        if (saved.catFilters && typeof saved.catFilters === "object") {
+          state.catFilters = {};
+          Object.keys(saved.catFilters).forEach((col) => {
+            const arr = saved.catFilters[col];
+            if (Array.isArray(arr) && arr.length) state.catFilters[col] = new Set(arr);
+          });
+        }
+        if (saved.dateFilters && typeof saved.dateFilters === "object") {
+          state.dateFilters = Object.assign({}, saved.dateFilters);
+        }
+        if (typeof saved.kpiFilter === "string") state.kpiFilter = saved.kpiFilter;
+      } catch (_) { /* ignore */ }
     }
 
     function analyze() {
       const headers = api.getHeaders();
       const rows = api.getRows();
       state.hash = headerHash(headers);
+      state.fingerprint = api.getFingerprint ? api.getFingerprint() : state.hash;
       state.visible = loadVisiblePrefs(state.hash, headers);
       state.cols = headers.map((h) => {
         const values = rows.map((r) => r[h]);
         return inferColumn(h, values);
       });
+      restoreViewPrefs();
     }
 
     function visibleHeaders() {
       return api.getHeaders().filter((h) => state.visible[h] !== false);
+    }
+
+    function toggleCatFilter(col, val) {
+      if (!state.catFilters[col]) state.catFilters[col] = new Set();
+      const set = state.catFilters[col];
+      if (set.has(val)) set.delete(val);
+      else set.add(val);
+      if (!set.size) delete state.catFilters[col];
+      state.kpiFilter = "";
+      persistView();
+      renderAll();
+    }
+
+    function setDateFilter(col, horizon) {
+      const cur = state.dateFilters[col] || "";
+      if (horizon === "all" || horizon === cur) {
+        delete state.dateFilters[col];
+      } else {
+        state.dateFilters[col] = horizon;
+      }
+      state.kpiFilter = "";
+      persistView();
+      renderAll();
+    }
+
+    function clearAllFilters() {
+      state.catFilters = {};
+      state.dateFilters = {};
+      state.kpiFilter = "";
+      state.search = "";
+      if ($("searchGeneric")) $("searchGeneric").value = "";
+      persistView();
+      renderAll();
+    }
+
+    function toggleKpiFilter(id) {
+      if (state.kpiFilter === id) {
+        state.kpiFilter = "";
+      } else {
+        state.kpiFilter = id;
+        /* map date KPI clicks onto that column's overdue horizon */
+        if (id.startsWith("date-")) {
+          const header = id.slice(5);
+          state.dateFilters[header] = "overdue";
+        }
+        if (id === "rows") {
+          clearAllFilters();
+          return;
+        }
+      }
+      persistView();
+      renderAll();
+    }
+
+    function rowPassesDateFilter(r, col, horizon) {
+      const d = parseDate(r[col]);
+      if (!d) return false;
+      const n = daysUntil(d);
+      if (horizon === "overdue") return n < 0;
+      if (horizon === "7d") return n >= 0 && n <= 7;
+      if (horizon === "30d") return n >= 0 && n <= 30;
+      return true;
+    }
+
+    function filteredRows() {
+      const q = norm(state.search);
+      const vis = visibleHeaders();
+      let list = api.getRows().map((r, idx) => ({ r, idx }));
+
+      /* category multi-select: within a column OR of selected values; across columns AND */
+      Object.keys(state.catFilters).forEach((col) => {
+        const set = state.catFilters[col];
+        if (!set || !set.size) return;
+        list = list.filter(({ r }) => set.has(String(r[col] == null ? "" : r[col]).trim()));
+      });
+
+      Object.keys(state.dateFilters).forEach((col) => {
+        const horizon = state.dateFilters[col];
+        if (!horizon || horizon === "all") return;
+        list = list.filter(({ r }) => rowPassesDateFilter(r, col, horizon));
+      });
+
+      if (q) {
+        list = list.filter(({ r }) =>
+          vis.some((h) => norm(r[h]).includes(q))
+        );
+      }
+
+      if (state.sortKey) {
+        const col = state.cols.find((c) => c.header === state.sortKey);
+        const type = col ? col.type : "text";
+        const dir = state.sortDir;
+        const key = state.sortKey;
+        list.sort((a, b) => {
+          const av = cellSortValue(key, a.r[key], type);
+          const bv = cellSortValue(key, b.r[key], type);
+          if (av < bv) return -1 * dir;
+          if (av > bv) return 1 * dir;
+          return 0;
+        });
+      }
+      return list;
     }
 
     function buildKpis() {
@@ -173,7 +357,7 @@
         label: "Rows",
         value: rows.length,
         color: "var(--soft)",
-        hint: `${state.cols.length} columns`
+        hint: `${state.cols.length} columns · click to clear filters`
       });
 
       const numeric = state.cols
@@ -202,7 +386,7 @@
       });
 
       const dateCols = state.cols.filter((c) => c.type === "date");
-      dateCols.slice(0, 2).forEach((c) => {
+      dateCols.forEach((c) => {
         let overdue = 0,
           soon7 = 0,
           soon30 = 0,
@@ -222,13 +406,19 @@
           label: c.header,
           value: overdue,
           color: overdue ? "var(--red)" : "var(--good)",
-          hint: `overdue · ${soon7} ≤7d · ${soon30} ≤30d`
+          hint: `overdue · ${soon7} ≤7d · ${soon30} ≤30d · click to filter`
         });
       });
 
       $("kpisGeneric").innerHTML = cards
         .map(
-          (k) => `<div class="kpi" data-kpi="${escapeHtml(k.id)}">
+          (k) => `<div class="kpi clickable${
+            state.kpiFilter === k.id ||
+            (k.id.startsWith("date-") &&
+              state.dateFilters[k.id.slice(5)] === "overdue")
+              ? " active"
+              : ""
+          }" data-kpi="${escapeHtml(k.id)}" role="button" tabindex="0">
         <div class="lbl">${escapeHtml(k.label)}</div>
         <div class="num" style="color:${k.color}">${escapeHtml(String(k.value))}</div>
         <div class="hint">${escapeHtml(k.hint)}</div>
@@ -236,7 +426,11 @@
         )
         .join("");
 
-      /* Category top-value chips */
+      $("kpisGeneric").querySelectorAll(".kpi").forEach((el) => {
+        el.onclick = () => toggleKpiFilter(el.dataset.kpi);
+      });
+
+      /* Category top-value chips — multi-select toggle */
       const cats = state.cols.filter((c) => c.type === "category").slice(0, 4);
       const chipHtml = [];
       cats.forEach((c) => {
@@ -248,30 +442,60 @@
         });
         const top = Object.keys(counts)
           .sort((a, b) => counts[b] - counts[a])
-          .slice(0, 5);
+          .slice(0, 8);
         if (!top.length) return;
+        const activeSet = state.catFilters[c.header];
         chipHtml.push(
           `<div class="cat-group"><span class="cat-label">${escapeHtml(
             c.header
           )}</span>${top
-            .map(
-              (v) =>
-                `<span class="chip muted cat-chip" data-col="${escapeHtml(
-                  c.header
-                )}" data-val="${escapeHtml(v)}">${escapeHtml(v)} · ${
-                  counts[v]
-                }</span>`
-            )
+            .map((v) => {
+              const on = activeSet && activeSet.has(v);
+              return `<span class="chip muted cat-chip${on ? " active" : ""}" data-col="${escapeHtml(
+                c.header
+              )}" data-val="${escapeHtml(v)}" role="button" tabindex="0">${escapeHtml(v)} · ${
+                counts[v]
+              }</span>`;
+            })
             .join("")}</div>`
         );
       });
       $("catChips").innerHTML = chipHtml.join("");
       $("catChips").querySelectorAll(".cat-chip").forEach((el) => {
-        el.onclick = () => {
-          state.search = el.dataset.val || "";
-          $("searchGeneric").value = state.search;
-          renderTable();
-        };
+        el.onclick = () => toggleCatFilter(el.dataset.col, el.dataset.val);
+      });
+    }
+
+    function buildDateHorizons() {
+      const dateCols = state.cols.filter((c) => c.type === "date");
+      if (!dateCols.length) {
+        $("dateHorizons").innerHTML = "";
+        return;
+      }
+      const parts = dateCols.map((c) => {
+        const cur = state.dateFilters[c.header] || "all";
+        const opts = [
+          { id: "overdue", label: "Overdue" },
+          { id: "7d", label: "Next 7d" },
+          { id: "30d", label: "Next 30d" },
+          { id: "all", label: "All" }
+        ];
+        return `<div class="horizon-group" data-col="${escapeHtml(c.header)}">
+          <span class="horizon-label" title="${escapeHtml(c.header)}">${escapeHtml(c.header)}</span>
+          ${opts
+            .map((o) => {
+              const on = cur === o.id || (o.id === "all" && !state.dateFilters[c.header]);
+              return `<span class="chip muted horizon-chip${on ? " active" : ""}" data-horizon="${o.id}" role="button" tabindex="0">${o.label}</span>`;
+            })
+            .join("")}
+        </div>`;
+      });
+      $("dateHorizons").innerHTML = parts.join("");
+      $("dateHorizons").querySelectorAll(".horizon-group").forEach((group) => {
+        const col = group.dataset.col;
+        group.querySelectorAll(".horizon-chip").forEach((chip) => {
+          chip.onclick = () => setDateFilter(col, chip.dataset.horizon);
+        });
       });
     }
 
@@ -285,35 +509,6 @@
         return d ? d.getTime() : 0;
       }
       return norm(raw);
-    }
-
-    function filteredRows() {
-      const q = norm(state.search);
-      const vis = visibleHeaders();
-      let list = api.getRows().map((r, idx) => ({ r, idx }));
-      if (q) {
-        list = list.filter(({ r }) =>
-          vis.some((h) => norm(r[h]).includes(q))
-        );
-      }
-      if (state.sortKey) {
-        const col = state.cols.find((c) => c.header === state.sortKey);
-        const type = col ? col.type : "text";
-        const dir = state.sortDir;
-        const key = state.sortKey;
-        list.sort((a, b) => {
-          const av = cellSortValue(key, a.r[key], type);
-          const bv = cellSortValue(key, b.r[key], type);
-          if (av < bv) return -1 * dir;
-          if (av > bv) return 1 * dir;
-          return 0;
-        });
-      }
-      return list;
-    }
-
-    function typeBadge(t) {
-      return `<span class="type-badge">${t}</span>`;
     }
 
     function renderCell(header, raw, type) {
@@ -346,6 +541,10 @@
       return `<td>${escapeHtml(String(raw))}</td>`;
     }
 
+    function typeBadge(t) {
+      return `<span class="type-badge">${t}</span>`;
+    }
+
     function renderTable() {
       const vis = visibleHeaders();
       const typeMap = {};
@@ -372,6 +571,7 @@
             state.sortKey = col;
             state.sortDir = 1;
           }
+          persistView();
           renderTable();
         };
       });
@@ -389,9 +589,27 @@
         })
         .join("");
 
+      const filterBits = [];
+      Object.keys(state.catFilters).forEach((col) => {
+        const set = state.catFilters[col];
+        if (set && set.size) filterBits.push(`${col}: ${Array.from(set).join(", ")}`);
+      });
+      Object.keys(state.dateFilters).forEach((col) => {
+        const h = state.dateFilters[col];
+        if (h && h !== "all") filterBits.push(`${col}: ${h}`);
+      });
+      const filterNote = filterBits.length
+        ? ` · filtered (${filterBits.join(" · ")})`
+        : "";
       $("tableFootGeneric").textContent = `Showing ${list.length} of ${
         api.getRows().length
-      } rows`;
+      } rows${filterNote}`;
+    }
+
+    function renderAll() {
+      buildKpis();
+      buildDateHorizons();
+      renderTable();
     }
 
     function drawColPanel() {
@@ -422,12 +640,42 @@
       if (!panel.classList.contains("hidden")) drawColPanel();
     }
 
+    function exportCurrentView() {
+      const vis = visibleHeaders();
+      const list = filteredRows();
+      const lines = [];
+      lines.push(vis.map(csvEscape).join(","));
+      list.forEach(({ r }) => {
+        lines.push(
+          vis
+            .map((h) => {
+              const raw = r[h];
+              if (raw instanceof Date && !isNaN(raw)) return csvEscape(raw.toISOString().slice(0, 10));
+              return csvEscape(raw);
+            })
+            .join(",")
+        );
+      });
+      const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      const base = (api.getFileName && api.getFileName()) || "dashboard-view";
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = URL.createObjectURL(blob);
+      a.download = base.replace(/\.[^.]+$/, "") + `-view-${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }, 500);
+    }
+
     function build() {
       analyze();
       $("setup").classList.add("hidden");
       $("boardFleet").classList.add("hidden");
       $("boardGeneric").classList.remove("hidden");
-      $("menuBtn").classList.remove("hidden");
+      document.querySelectorAll(".board-only").forEach((el) => el.classList.remove("hidden"));
       api.updateLiveMeta("generic");
       api.syncMenuMode("generic");
 
@@ -441,20 +689,20 @@
         .join(" · ");
       $("genericHint").textContent = summary || "Dashboard from header row";
 
-      buildKpis();
-      renderTable();
+      renderAll();
       $("colPanel").classList.add("hidden");
+      persistView();
     }
 
     function wire() {
       $("searchGeneric").oninput = () => {
         state.search = $("searchGeneric").value;
+        persistView();
         renderTable();
       };
-      $("colsBoardBtn").onclick = () => toggleColPanel();
       $("colsBtn").onclick = () => {
-        $("menu").classList.add("hidden");
         if ($("colPanel").classList.contains("hidden")) toggleColPanel();
+        else $("colPanel").classList.add("hidden");
       };
       $("sheetSelectGeneric").onchange = () => {
         api.useSheet($("sheetSelectGeneric").value);
@@ -467,8 +715,8 @@
           panel &&
           !panel.classList.contains("hidden") &&
           !panel.contains(e.target) &&
-          e.target !== $("colsBoardBtn") &&
-          e.target !== $("colsBtn")
+          e.target !== $("colsBtn") &&
+          !($("colsBtn") && $("colsBtn").contains(e.target))
         ) {
           panel.classList.add("hidden");
         }
@@ -481,7 +729,18 @@
       build,
       refresh: build,
       headerHash,
-      analyze
+      analyze,
+      toggleColPanel,
+      exportCurrentView,
+      persistView,
+      getViewState: () => ({
+        sortKey: state.sortKey,
+        sortDir: state.sortDir,
+        visible: state.visible,
+        catFilters: state.catFilters,
+        dateFilters: state.dateFilters,
+        search: state.search
+      })
     };
   }
 
@@ -490,6 +749,7 @@
     headerHash,
     inferColumn,
     MODE_KEY_PREFIX,
-    COLS_KEY_PREFIX
+    COLS_KEY_PREFIX,
+    VIEW_KEY_PREFIX
   };
 })(window);

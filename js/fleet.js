@@ -1,4 +1,4 @@
-/* Fleet layout preset — v1 KPIs / queue / drawer / mapper (optional layout) */
+/* Fleet layout preset — v1 KPIs / queue / drawer / mapper + Phase 3 click-to-filter */
 (function (global) {
   "use strict";
 
@@ -14,6 +14,7 @@
     { key: "notes", label: "Notes", aliases: ["notes", "note", "comments"] }
   ];
   const MAP_KEY = "fleetboard-map-v3";
+  const VIEW_KEY_PREFIX = "dashboard-fleet-view-v1:";
 
   const $ = (id) => document.getElementById(id);
 
@@ -36,7 +37,6 @@
     const n = norm(h);
     return aliases.some((a) => {
       if (n === a) return true;
-      /* short aliases (reg, vin) must be exact — avoid "reg"→"region" */
       if (a.length <= 3) return false;
       return n.includes(a);
     });
@@ -54,6 +54,12 @@
       if (headers.some((h) => headerMatchesAlias(h, group))) hits += 1;
     });
     return hits >= 2;
+  }
+
+  function csvEscape(v) {
+    const s = v == null ? "" : String(v);
+    if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+    return s;
   }
 
   function create(api) {
@@ -111,6 +117,43 @@
       return `${n} days left`;
     }
 
+    function viewKey() {
+      const fp = api.getFingerprint ? api.getFingerprint() : "";
+      return fp ? VIEW_KEY_PREFIX + fp : null;
+    }
+
+    function persistView() {
+      const key = viewKey();
+      if (!key) return;
+      try {
+        localStorage.setItem(
+          key,
+          JSON.stringify({
+            layoutMode: "fleet",
+            sheet: api.getSheet ? api.getSheet() : "",
+            filter: state.filter,
+            search: state.search
+          })
+        );
+      } catch (_) { /* ignore */ }
+    }
+
+    function restoreView() {
+      const key = viewKey();
+      if (!key) return;
+      try {
+        const raw = localStorage.getItem(key);
+        if (!raw) return;
+        const saved = JSON.parse(raw);
+        if (typeof saved.filter === "string") state.filter = saved.filter;
+        if (typeof saved.search === "string") {
+          state.search = saved.search;
+          if ($("search")) $("search").value = state.search;
+        }
+        if ($("statusFilter")) $("statusFilter").value = state.filter;
+      } catch (_) { /* ignore */ }
+    }
+
     function guessMap() {
       const saved = JSON.parse(localStorage.getItem(MAP_KEY) || "{}");
       state.map = {};
@@ -158,91 +201,92 @@
       $("setup").classList.remove("hidden");
       $("boardFleet").classList.add("hidden");
       $("boardGeneric").classList.add("hidden");
+      document.querySelectorAll(".board-only").forEach((el) => el.classList.remove("hidden"));
+      api.syncMenuMode("fleet");
     }
 
     function kpi(id, label, value, color, hint) {
-      return `<div class="kpi" data-kpi="${id}">
+      const active =
+        (id === "fleet" && !state.filter) ||
+        (id !== "fleet" && state.filter === id);
+      return `<div class="kpi clickable${active ? " active" : ""}" data-kpi="${id}" role="button" tabindex="0">
       <div class="lbl">${label}</div>
       <div class="num" style="color:${color}">${value}</div>
       <div class="hint">${hint}</div>
     </div>`;
     }
 
-    function buildBoard() {
-      localStorage.setItem(MAP_KEY, JSON.stringify(state.map));
-      $("setup").classList.add("hidden");
-      $("boardFleet").classList.remove("hidden");
-      $("boardGeneric").classList.add("hidden");
-      $("menuBtn").classList.remove("hidden");
-      api.updateLiveMeta("fleet");
-      api.syncMenuMode("fleet");
+    function matchesFilter(r, filter) {
+      const insp = inspInfo(r);
+      const reg = regInfo(r);
+      if (!filter || filter === "fleet") return true;
+      if (filter === "insp-overdue") return !!(insp && insp.n < 0);
+      if (filter === "insp-week") return !!(insp && insp.n >= 0 && insp.n <= 7);
+      if (filter === "insp-30") return !!(insp && insp.n >= 0 && insp.n <= 30);
+      if (filter === "reg-overdue") return !!(reg && reg.n < 0);
+      if (filter === "missing") return !insp;
+      return true;
+    }
 
-      let overdue = 0,
-        week = 0,
-        thirty = 0,
-        missing = 0,
-        regOver = 0;
+    function setFilter(next) {
+      /* click again clears */
+      if (state.filter === next || (next === "" && !state.filter)) {
+        state.filter = "";
+      } else {
+        state.filter = next || "";
+      }
+      if ($("statusFilter")) $("statusFilter").value = state.filter;
+      persistView();
+      renderQueue();
+      renderTable();
+      syncKpiActive();
+    }
+
+    function syncKpiActive() {
+      $("kpis").querySelectorAll(".kpi").forEach((k) => {
+        const id = k.dataset.kpi;
+        const on =
+          (id === "fleet" && !state.filter) ||
+          (id !== "fleet" && state.filter === id);
+        k.classList.toggle("active", on);
+      });
+    }
+
+    function renderQueue() {
       const queue = [];
       rows().forEach((r, idx) => {
+        if (!matchesFilter(r, state.filter)) return;
         const insp = inspInfo(r);
-        const reg = regInfo(r);
-        if (!insp) missing += 1;
-        else {
-          if (insp.n < 0) overdue += 1;
-          else if (insp.n <= 7) week += 1;
-          else if (insp.n <= 30) thirty += 1;
-          if (insp.n <= 45) queue.push({ idx, r, insp });
+        if (!insp) return;
+        /* when no bucket filter, keep 45-day queue spirit; when filtered, show matching with dates */
+        if (!state.filter && insp.n > 45) return;
+        if (state.filter === "insp-overdue" || state.filter === "insp-week" || state.filter === "insp-30") {
+          queue.push({ idx, r, insp });
+        } else if (!state.filter) {
+          queue.push({ idx, r, insp });
+        } else if (insp) {
+          queue.push({ idx, r, insp });
         }
-        if (reg && reg.n < 0) regOver += 1;
       });
       queue.sort((a, b) => a.insp.n - b.insp.n);
 
-      $("kpis").innerHTML = [
-        kpi(
-          "fleet",
-          "Units",
-          rows().length,
-          "var(--soft)",
-          `${regOver} registration${regOver === 1 ? "" : "s"} overdue`
-        ),
-        kpi(
-          "insp-overdue",
-          "90-day overdue",
-          overdue,
-          overdue ? "var(--red)" : "var(--good)",
-          "Inspection past due"
-        ),
-        kpi(
-          "insp-week",
-          "Due in 7 days",
-          week,
-          week ? "var(--warn)" : "var(--accent)",
-          "Act this week"
-        ),
-        kpi(
-          "insp-30",
-          "Due in 30 days",
-          thirty,
-          thirty ? "var(--warn)" : "var(--accent)",
-          "On the 90-day horizon"
-        )
-      ].join("");
-      $("kpis").querySelectorAll(".kpi").forEach((el) => {
-        el.onclick = () => {
-          state.filter = el.dataset.kpi === "fleet" ? "" : el.dataset.kpi;
-          $("statusFilter").value = state.filter;
-          renderTable();
-          $("kpis")
-            .querySelectorAll(".kpi")
-            .forEach((k) =>
-              k.classList.toggle("active", k.dataset.kpi === el.dataset.kpi)
-            );
-        };
-      });
+      const titleHint = state.filter
+        ? ` · filtered: ${
+            state.filter === "insp-overdue"
+              ? "overdue"
+              : state.filter === "insp-week"
+                ? "7 days"
+                : state.filter === "insp-30"
+                  ? "30 days"
+                  : state.filter
+          }`
+        : "";
+      const h3 = $("dueList").parentElement.querySelector("h3");
+      if (h3) h3.textContent = "90-day inspection queue" + titleHint;
 
       $("dueList").innerHTML =
         queue
-          .slice(0, 8)
+          .slice(0, 12)
           .map(
             ({ idx, r, insp }) => `
         <div class="q-item" data-idx="${idx}">
@@ -260,11 +304,83 @@
         </div>`
           )
           .join("") ||
-        `<div class="meta" style="padding:8px 0">No inspections due in the next 45 days.</div>`;
+        `<div class="meta" style="padding:8px 0">${
+          state.filter
+            ? "No units match this filter."
+            : "No inspections due in the next 45 days."
+        }</div>`;
       $("dueList").querySelectorAll(".q-item").forEach((el) => {
         el.onclick = () => openRow(+el.dataset.idx);
       });
+    }
+
+    function buildBoard() {
+      localStorage.setItem(MAP_KEY, JSON.stringify(state.map));
+      restoreView();
+      $("setup").classList.add("hidden");
+      $("boardFleet").classList.remove("hidden");
+      $("boardGeneric").classList.add("hidden");
+      document.querySelectorAll(".board-only").forEach((el) => el.classList.remove("hidden"));
+      api.updateLiveMeta("fleet");
+      api.syncMenuMode("fleet");
+
+      let overdue = 0,
+        week = 0,
+        thirty = 0,
+        missing = 0,
+        regOver = 0;
+      rows().forEach((r) => {
+        const insp = inspInfo(r);
+        const reg = regInfo(r);
+        if (!insp) missing += 1;
+        else {
+          if (insp.n < 0) overdue += 1;
+          else if (insp.n <= 7) week += 1;
+          else if (insp.n <= 30) thirty += 1;
+        }
+        if (reg && reg.n < 0) regOver += 1;
+      });
+
+      $("kpis").innerHTML = [
+        kpi(
+          "fleet",
+          "Units",
+          rows().length,
+          "var(--soft)",
+          `${regOver} registration${regOver === 1 ? "" : "s"} overdue · click = all`
+        ),
+        kpi(
+          "insp-overdue",
+          "90-day overdue",
+          overdue,
+          overdue ? "var(--red)" : "var(--good)",
+          "Click to filter queue + table"
+        ),
+        kpi(
+          "insp-week",
+          "Due in 7 days",
+          week,
+          week ? "var(--warn)" : "var(--accent)",
+          "Click to filter queue + table"
+        ),
+        kpi(
+          "insp-30",
+          "Due in 30 days",
+          thirty,
+          thirty ? "var(--warn)" : "var(--accent)",
+          "Click to filter queue + table"
+        )
+      ].join("");
+      $("kpis").querySelectorAll(".kpi").forEach((el) => {
+        el.onclick = () => {
+          const id = el.dataset.kpi;
+          setFilter(id === "fleet" ? "" : id);
+        };
+      });
+
+      renderQueue();
       renderTable();
+      persistView();
     }
 
     function visibleRows() {
@@ -272,15 +388,7 @@
       return rows()
         .map((r, idx) => ({ r, idx }))
         .filter(({ r }) => {
-          const insp = inspInfo(r);
-          const reg = regInfo(r);
-          if (state.filter === "insp-overdue" && !(insp && insp.n < 0)) return false;
-          if (state.filter === "insp-week" && !(insp && insp.n >= 0 && insp.n <= 7))
-            return false;
-          if (state.filter === "insp-30" && !(insp && insp.n >= 0 && insp.n <= 30))
-            return false;
-          if (state.filter === "reg-overdue" && !(reg && reg.n < 0)) return false;
-          if (state.filter === "missing" && insp) return false;
+          if (!matchesFilter(r, state.filter)) return false;
           if (!q) return true;
           return ["id", "year", "make", "plate", "vid", "driver", "notes"].some((k) =>
             norm(val(r, k)).includes(q)
@@ -387,22 +495,69 @@
       $("backdrop").classList.add("hidden");
     }
 
+    function exportCurrentView() {
+      const cols = ["id", "insp", "year", "make", "driver", "reg", "plate", "vid", "notes"].filter(
+        (k) => state.map[k]
+      );
+      const labels = {
+        id: "Unit#",
+        year: "Year",
+        make: "MAKE/MODEL",
+        plate: "License#",
+        vid: "Vehicle ID#",
+        reg: "Reg. Exp",
+        insp: "90 Day Insp.",
+        driver: "Driver",
+        notes: "Notes"
+      };
+      const list = visibleRows();
+      const lines = [];
+      lines.push(cols.map((k) => csvEscape(labels[k])).join(","));
+      list.forEach(({ r }) => {
+        lines.push(
+          cols
+            .map((k) => {
+              if (k === "insp" || k === "reg") {
+                const info = k === "insp" ? inspInfo(r) : regInfo(r);
+                return csvEscape(info ? info.date.toISOString().slice(0, 10) : "");
+              }
+              return csvEscape(val(r, k));
+            })
+            .join(",")
+        );
+      });
+      const blob = new Blob([lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      const base = (api.getFileName && api.getFileName()) || "fleet-view";
+      const stamp = new Date().toISOString().slice(0, 10);
+      a.href = URL.createObjectURL(blob);
+      a.download = base.replace(/\.[^.]+$/, "") + `-view-${stamp}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        URL.revokeObjectURL(a.href);
+        a.remove();
+      }, 500);
+    }
+
     function wire() {
       $("applyMap").onclick = () => {
         buildBoard();
       };
       $("remapBtn").onclick = () => {
-        $("menu").classList.add("hidden");
         showMapper();
       };
-      $("remapBoardBtn").onclick = () => showMapper();
       $("search").oninput = () => {
         state.search = $("search").value;
+        persistView();
         renderTable();
       };
       $("statusFilter").onchange = () => {
         state.filter = $("statusFilter").value;
+        persistView();
+        renderQueue();
         renderTable();
+        syncKpiActive();
       };
       $("backdrop").onclick = closeDrawer;
       $("sheetSelectFleet").onchange = () => {
@@ -443,7 +598,9 @@
       showMapper,
       buildBoard,
       guessMap,
-      closeDrawer
+      closeDrawer,
+      exportCurrentView,
+      persistView
     };
   }
 

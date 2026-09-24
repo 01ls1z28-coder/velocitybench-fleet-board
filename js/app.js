@@ -1,4 +1,4 @@
-/* VelocityBench Dashboard — shell: FSA, IndexedDB, mode routing */
+/* VelocityBench Dashboard — shell: FSA, IndexedDB, mode routing, Phase 3 persistence */
 (function () {
   "use strict";
 
@@ -8,6 +8,8 @@
   const POLL_MS = 4000;
   const MODE_KEY_PREFIX = FleetBoardGeneric.MODE_KEY_PREFIX;
   const DISMISS_KEY_PREFIX = "fleetboard-fleet-dismiss-v1:";
+  const LAST_META_KEY = "dashboard-last-workbook-v1";
+  const VIEW_KEY_PREFIX = FleetBoardGeneric.VIEW_KEY_PREFIX;
 
   const state = {
     wb: null,
@@ -17,12 +19,16 @@
     mode: "generic", /* generic | fleet */
     fileHandle: null,
     fileName: "",
+    fileSize: 0,
     lastModified: 0,
+    fingerprint: "",
     supportsFsa: typeof window.showOpenFilePicker === "function",
     autoCheck: true,
     pollTimer: null,
     locked: false,
-    headerHash: ""
+    headerHash: "",
+    fleetAvailable: false,
+    boardOpen: false
   };
 
   const $ = (id) => document.getElementById(id);
@@ -94,6 +100,44 @@
     }
   }
 
+  /* ── Fingerprint + last-workbook meta (local only) ── */
+  function makeFingerprint(name, size, lastModified) {
+    return [String(name || ""), String(size || 0), String(lastModified || 0)].join("|");
+  }
+
+  function saveLastMeta() {
+    try {
+      localStorage.setItem(
+        LAST_META_KEY,
+        JSON.stringify({
+          fileName: state.fileName,
+          fileSize: state.fileSize,
+          lastModified: state.lastModified,
+          fingerprint: state.fingerprint,
+          sheet: state.sheet,
+          mode: state.mode,
+          headerHash: state.headerHash,
+          savedAt: Date.now()
+        })
+      );
+    } catch (_) { /* ignore */ }
+  }
+
+  function loadLastMeta() {
+    try {
+      const raw = localStorage.getItem(LAST_META_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function clearLastMeta() {
+    try {
+      localStorage.removeItem(LAST_META_KEY);
+    } catch (_) { /* ignore */ }
+  }
+
   /* ── UI helpers ── */
   function toast(msg) {
     const el = $("toast");
@@ -112,36 +156,50 @@
     $("fsaHint").classList.toggle("hidden", !show);
   }
 
+  function setRestoreHint(show, text) {
+    $("restoreHint").classList.toggle("hidden", !show);
+    if (text) $("restoreHintText").textContent = text;
+  }
+
   function setFleetSuggest(show) {
     $("fleetSuggest").classList.toggle("hidden", !show);
   }
 
-  function updateLiveMeta(which) {
-    const nameId = which === "fleet" ? "fileNameFleet" : "fileNameGeneric";
-    const hintId = which === "fleet" ? "fileHintFleet" : "fileHintGeneric";
-    $(nameId).textContent = state.fileName || "Workbook";
+  function updateLiveMeta() {
     let hint = "Local workbook";
     if (state.supportsFsa && state.fileHandle) {
       hint = "Live file handle · Chrome/Edge Refresh";
     } else if (state.fileName) {
       hint = "Fallback mode · re-choose file to refresh";
     }
-    $(hintId).textContent = hint;
-    /* keep both in sync */
     $("fileNameFleet").textContent = state.fileName || "Workbook";
     $("fileNameGeneric").textContent = state.fileName || "Workbook";
     $("fileHintFleet").textContent = hint;
     $("fileHintGeneric").textContent = hint;
   }
 
-  function syncMenuMode(mode) {
+  function syncHeaderActions(mode) {
     state.mode = mode;
+    state.boardOpen = true;
+    document.querySelectorAll(".board-only").forEach((el) => {
+      el.classList.remove("hidden");
+    });
     document.querySelectorAll(".fleet-only").forEach((el) => {
       el.classList.toggle("hidden", mode !== "fleet");
     });
     document.querySelectorAll(".generic-only").forEach((el) => {
       el.classList.toggle("hidden", mode !== "generic");
     });
+    /* Use Fleet layout only when fleet headers detected / previously available */
+    document.querySelectorAll(".fleet-available-only").forEach((el) => {
+      const showGeneric = mode === "generic" && state.fleetAvailable;
+      el.classList.toggle("hidden", !showGeneric);
+    });
+  }
+
+  /* keep old name used by modules */
+  function syncMenuMode(mode) {
+    syncHeaderActions(mode);
   }
 
   function saveModePreference(mode) {
@@ -149,12 +207,47 @@
     try {
       localStorage.setItem(MODE_KEY_PREFIX + state.headerHash, mode);
     } catch (_) { /* ignore */ }
+    /* also under fingerprint for Phase 3 restore */
+    if (state.fingerprint) {
+      try {
+        const key = VIEW_KEY_PREFIX + state.fingerprint;
+        const prev = JSON.parse(localStorage.getItem(key) || "{}");
+        prev.layoutMode = mode;
+        prev.sheet = state.sheet;
+        localStorage.setItem(key, JSON.stringify(prev));
+      } catch (_) { /* ignore */ }
+    }
+    saveLastMeta();
   }
 
   function loadModePreference() {
+    /* prefer fingerprint view prefs */
+    if (state.fingerprint) {
+      try {
+        const raw = localStorage.getItem(VIEW_KEY_PREFIX + state.fingerprint);
+        if (raw) {
+          const saved = JSON.parse(raw);
+          if (saved.layoutMode === "fleet" || saved.layoutMode === "generic") {
+            return saved.layoutMode;
+          }
+        }
+      } catch (_) { /* ignore */ }
+    }
     if (!state.headerHash) return null;
     try {
       return localStorage.getItem(MODE_KEY_PREFIX + state.headerHash);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function loadSavedSheet() {
+    if (!state.fingerprint) return null;
+    try {
+      const raw = localStorage.getItem(VIEW_KEY_PREFIX + state.fingerprint);
+      if (!raw) return null;
+      const saved = JSON.parse(raw);
+      return saved.sheet || null;
     } catch (_) {
       return null;
     }
@@ -182,12 +275,18 @@
   const api = {
     getHeaders: () => state.headers,
     getRows: () => state.rows,
+    getSheet: () => state.sheet,
+    getFileName: () => state.fileName,
+    getFingerprint: () => state.fingerprint || state.headerHash,
     updateLiveMeta,
     syncMenuMode,
     useSheet,
     afterSheetChange: () => {
       state.headerHash = FleetBoardGeneric.headerHash(state.headers);
+      state.fleetAvailable = FleetBoardFleet.looksLikeFleet(state.headers);
+      saveLastMeta();
       maybeSuggestFleet();
+      syncHeaderActions(state.mode);
     }
   };
 
@@ -211,6 +310,7 @@
     state.fileHandle = handle;
     await idbSetHandle(handle);
     setFsaHint(false);
+    setRestoreHint(false);
     await loadFromHandle(handle, { silent: false });
   }
 
@@ -237,8 +337,10 @@
       const file = await handle.getFile();
       setLockBanner(false);
       state.fileName = file.name;
+      state.fileSize = file.size || 0;
       state.lastModified = file.lastModified;
-      updateLiveMeta(state.mode);
+      state.fingerprint = makeFingerprint(file.name, file.size, file.lastModified);
+      updateLiveMeta();
       const buf = await file.arrayBuffer();
       await parseWorkbook(buf, { toastOnSuccess: !!opts.toastOnSuccess });
       startPoll();
@@ -252,9 +354,12 @@
   function loadFileBlob(file) {
     state.fileHandle = null;
     state.fileName = file.name || "workbook";
+    state.fileSize = file.size || 0;
     state.lastModified = file.lastModified || 0;
-    updateLiveMeta(state.mode);
+    state.fingerprint = makeFingerprint(state.fileName, state.fileSize, state.lastModified);
+    updateLiveMeta();
     setFsaHint(!state.supportsFsa);
+    setRestoreHint(false);
     const reader = new FileReader();
     reader.onload = (e) => {
       parseWorkbook(e.target.result, {}).catch((err) => {
@@ -283,13 +388,17 @@
       state.wb = XLSX.read(buf, { type: "array", cellDates: true });
       $("loader").classList.add("hidden");
       setLockBanner(false);
+      const savedSheet = loadSavedSheet();
       const keepSheet =
         state.sheet && state.wb.SheetNames.includes(state.sheet)
           ? state.sheet
-          : state.wb.SheetNames[0];
+          : savedSheet && state.wb.SheetNames.includes(savedSheet)
+            ? savedSheet
+            : state.wb.SheetNames[0];
       useSheet(keepSheet);
       fillSheetSelects();
       routeAfterLoad();
+      saveLastMeta();
       if (opts.toastOnSuccess) showToastUpdated();
     } catch (err) {
       alert("Could not read that file.\n" + (err && err.message ? err.message : err));
@@ -309,6 +418,7 @@
       state.headers = [];
       state.rows = [];
       state.headerHash = "";
+      state.fleetAvailable = false;
       return;
     }
     state.headers = data[headerIdx].map((h) => String(h).trim());
@@ -323,10 +433,11 @@
         return o;
       });
     state.headerHash = FleetBoardGeneric.headerHash(state.headers);
+    state.fleetAvailable = FleetBoardFleet.looksLikeFleet(state.headers);
   }
 
   function maybeSuggestFleet() {
-    const isFleet = FleetBoardFleet.looksLikeFleet(state.headers);
+    const isFleet = state.fleetAvailable;
     if (
       state.mode === "generic" &&
       isFleet &&
@@ -341,7 +452,7 @@
 
   function routeAfterLoad() {
     const pref = loadModePreference();
-    const isFleet = FleetBoardFleet.looksLikeFleet(state.headers);
+    const isFleet = state.fleetAvailable;
 
     if (pref === "fleet" && isFleet) {
       enterFleet({ skipMapper: true });
@@ -349,7 +460,6 @@
       return;
     }
 
-    /* Default: generic — even on fleet files until user opts in */
     enterGeneric();
     maybeSuggestFleet();
   }
@@ -360,14 +470,17 @@
     setFleetSuggest(false);
     fleet.closeDrawer();
     generic.build();
+    syncHeaderActions("generic");
   }
 
   function enterFleet(opts) {
     opts = opts || {};
     state.mode = "fleet";
+    state.fleetAvailable = true;
     saveModePreference("fleet");
     setFleetSuggest(false);
     fleet.activate({ skipMapper: !!opts.skipMapper });
+    syncHeaderActions("fleet");
   }
 
   async function refreshWorkbook() {
@@ -394,6 +507,24 @@
     pickFile();
   }
 
+  function exportCurrentView() {
+    if (state.mode === "fleet") {
+      if (fleet.exportCurrentView) fleet.exportCurrentView();
+    } else {
+      if (generic.exportCurrentView) generic.exportCurrentView();
+    }
+    toast("Exported current view CSV");
+  }
+
+  async function openAnotherFile() {
+    await idbClearHandle();
+    state.fileHandle = null;
+    stopPoll();
+    /* keep last meta so gentle restore can still mention prior file if they cancel —
+       but clearing for intentional "open another" is fine; user is choosing anew */
+    location.reload();
+  }
+
   /* ── Auto-check poll ── */
   function stopPoll() {
     if (state.pollTimer) {
@@ -414,10 +545,12 @@
     try {
       const file = await state.fileHandle.getFile();
       setLockBanner(false);
-      if (file.lastModified !== state.lastModified) {
+      if (file.lastModified !== state.lastModified || file.size !== state.fileSize) {
         state.lastModified = file.lastModified;
+        state.fileSize = file.size || 0;
         state.fileName = file.name;
-        updateLiveMeta(state.mode);
+        state.fingerprint = makeFingerprint(file.name, file.size, file.lastModified);
+        updateLiveMeta();
         const buf = await file.arrayBuffer();
         await parseWorkbook(buf, { toastOnSuccess: true });
       }
@@ -470,28 +603,12 @@
     }
   });
 
-  $("menuBtn").onclick = () => $("menu").classList.toggle("hidden");
-  $("chooseOtherBtn").onclick = async () => {
-    $("menu").classList.add("hidden");
-    await idbClearHandle();
-    state.fileHandle = null;
-    stopPoll();
-    location.reload();
-  };
-  $("chooseExportBtn").onclick = () => {
-    $("menu").classList.add("hidden");
-    chooseExportCopy();
-  };
-  $("useFleetBtn").onclick = () => {
-    $("menu").classList.add("hidden");
-    enterFleet({ skipMapper: false });
-  };
-  $("useGenericBtn").onclick = () => {
-    $("menu").classList.add("hidden");
-    enterGeneric();
-  };
+  $("openAnotherBtn").onclick = () => openAnotherFile();
+  $("chooseExportBtn").onclick = () => chooseExportCopy();
+  $("exportViewBtn").onclick = () => exportCurrentView();
+  $("useFleetBtn").onclick = () => enterFleet({ skipMapper: false });
+  $("useGenericBtn").onclick = () => enterGeneric();
   $("setupGenericBtn").onclick = () => enterGeneric();
-  $("switchGenericFromFleet").onclick = () => enterGeneric();
   $("acceptFleetBtn").onclick = () => enterFleet({ skipMapper: false });
   $("dismissFleetBtn").onclick = () => {
     setDismissed();
@@ -503,23 +620,41 @@
   $("lockRetryBtn").onclick = () => refreshWorkbook();
   $("lockExportBtn").onclick = () => chooseExportCopy();
   $("fsaRepickBtn").onclick = () => pickFile();
+  $("restoreRepickBtn").onclick = () => pickFile();
+  $("restoreDismissBtn").onclick = () => {
+    setRestoreHint(false);
+  };
   $("autoCheckGeneric").onchange = (e) => setAutoCheck(e.target.checked);
   $("autoCheckFleet").onchange = (e) => setAutoCheck(e.target.checked);
 
-  document.addEventListener("click", (e) => {
-    if (!$("menu").contains(e.target) && e.target !== $("menuBtn")) {
-      $("menu").classList.add("hidden");
-    }
-  });
-
-  /* Restore FSA handle on load when possible */
+  /* Restore FSA handle on load when possible; else gentle prompt from last meta */
   (async function restoreHandle() {
-    if (!state.supportsFsa) return;
-    const handle = await idbGetHandle();
-    if (!handle) return;
-    const ok = await ensurePermission(handle, "read");
-    if (!ok) return;
-    state.fileHandle = handle;
-    await loadFromHandle(handle, { silent: true });
+    const meta = loadLastMeta();
+
+    if (state.supportsFsa) {
+      const handle = await idbGetHandle();
+      if (handle) {
+        const ok = await ensurePermission(handle, "read");
+        if (ok) {
+          state.fileHandle = handle;
+          await loadFromHandle(handle, { silent: true });
+          return;
+        }
+        /* handle remembered but permission not granted — prompt gently */
+        const name = (meta && meta.fileName) || handle.name || "your workbook";
+        setRestoreHint(
+          true,
+          `“${name}” was used last time on this device. Grant access or choose it again to restore your layout, columns, and filters.`
+        );
+        return;
+      }
+    }
+
+    if (meta && meta.fileName) {
+      setRestoreHint(
+        true,
+        `Last workbook on this browser: “${meta.fileName}”. Choose it again to restore your saved layout, columns, sort, and filters.`
+      );
+    }
   })();
 })();
