@@ -1,4 +1,4 @@
-# Fleet Board — how to use
+# Dashboard — how to use
 
 ## Quick start
 
@@ -15,17 +15,17 @@
 - Click a column header to sort. Use **Columns** to show/hide fields (prefs saved per header set).
 - No invented business labels — only types and stats from the cells.
 
-## Fleet Board layout (optional preset)
+## Fleet layout (optional preset)
 
 If headers look like Unit# / Reg.Exp / 90-day inspection, a banner offers **Use Fleet layout**.
 
 - That restores the v1 fleet UX: column mapper, 90-day queue, status filters, unit drawer.
 - Default stays **generic** until you accept (choice remembered in `localStorage`).
-- Switch anytime from the menu: **Use Fleet Board layout** / **Use generic layout**.
+- Switch anytime from the menu: **Use Fleet layout** / **Use generic layout**.
 
 ## Refresh (Chrome / Edge)
 
-Fleet Board uses the File System Access API when available:
+Dashboard uses the File System Access API when available:
 
 - After you pick a file, the page keeps a **file handle**.
 - **Refresh** re-reads the same path via `handle.getFile()` → SheetJS parse → redraw.
@@ -40,7 +40,7 @@ These browsers do not keep a reusable file handle the same way. Refresh must **r
 
 ## Excel lock (Windows)
 
-If Excel has the `.xlsx` open, reading it can fail. Fleet Board shows a red **Workbook locked** banner:
+If Excel has the `.xlsx` open, reading it can fail. Dashboard shows a red **Workbook locked** banner:
 
 1. **Retry** after closing the file in Excel (preferred — live workbook).
 2. Or **Choose export copy**: Save As / export CSV or XLSX elsewhere and open that copy so you are not fighting the lock.

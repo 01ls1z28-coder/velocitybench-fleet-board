@@ -1,4 +1,4 @@
-# VelocityBench Fleet Board
+# VelocityBench Dashboard
 
 Local Excel → flexible dashboard. Open any workbook on this computer; the browser builds KPIs and a table from your **header row**. **Nothing is uploaded.**
 
@@ -13,7 +13,7 @@ Hub: [velocitybench.com](https://velocitybench.com/) · Bench: [velocitybench.co
 ## Features
 
 - **Generic layout (default):** any `.xlsx` / `.xls` / `.csv` → inferred column types, auto KPIs, searchable/sortable table, column show/hide
-- **Fleet Board preset (optional):** detect Unit# / Reg.Exp / 90-day headers → v1 KPIs, 90-day queue, drawer, status filters, column mapper
+- **Fleet layout preset (optional):** detect Unit# / Reg.Exp / 90-day headers → v1 KPIs, 90-day queue, drawer, status filters, column mapper
 - File System Access API (Chrome/Edge): live file handle, **Refresh**, Auto-check while the tab is visible
 - IndexedDB persistence of the file handle (re-permission on reopen when the browser allows)
 - Fallback file picker + drag-drop for Safari/Firefox (refresh re-prompts)

@@ -1,4 +1,4 @@
-/* Fleet Board preset — v1 KPIs / queue / drawer / mapper (optional layout) */
+/* Fleet layout preset — v1 KPIs / queue / drawer / mapper (optional layout) */
 (function (global) {
   "use strict";
 

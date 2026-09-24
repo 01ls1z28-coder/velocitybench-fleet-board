@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="VelocityBench Fleet Board — local Excel dashboard from your headers. Data stays in your browser." />
-  <title>Fleet Board — VelocityBench</title>
+  <meta name="description" content="VelocityBench Dashboard — local Excel dashboard from your headers. Data stays in your browser." />
+  <title>Dashboard — VelocityBench</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="vendor/xlsx.full.min.js"></script>
 </head>
@@ -12,9 +12,9 @@
   <div class="app">
     <header class="header">
       <div class="brand">
-        <div class="logo-mark" aria-hidden="true">F</div>
+        <div class="logo-mark" aria-hidden="true">D</div>
         <div class="brand-text">
-          <div class="logo-text">Fleet Board</div>
+          <div class="logo-text">Dashboard</div>
           <div class="logo-badge">VelocityBench Hub</div>
         </div>
       </div>
@@ -27,7 +27,7 @@
       <button type="button" id="remapBtn" class="fleet-only hidden">Match columns</button>
       <button type="button" id="colsBtn" class="generic-only hidden">Show / hide columns</button>
       <button type="button" id="useGenericBtn" class="fleet-only hidden">Use generic layout</button>
-      <button type="button" id="useFleetBtn" class="generic-only hidden">Use Fleet Board layout</button>
+      <button type="button" id="useFleetBtn" class="generic-only hidden">Use Fleet layout</button>
       <button type="button" id="chooseOtherBtn">Open another file</button>
       <button type="button" id="chooseExportBtn">Choose export copy</button>
     </div>
@@ -56,7 +56,7 @@
     <div id="fleetSuggest" class="banner info hidden" role="status">
       <div class="banner-text">
         <strong>Fleet workbook detected.</strong>
-        Headers look like Unit# / Reg.Exp / 90-day inspection. Stay on the generic dashboard, or switch to the Fleet Board layout.
+        Headers look like Unit# / Reg.Exp / 90-day inspection. Stay on the generic dashboard, or switch to the Fleet layout.
       </div>
       <div class="banner-actions">
         <button class="btn btn-primary" type="button" id="acceptFleetBtn">Use Fleet layout</button>
@@ -153,7 +153,7 @@
       </div>
 
       <div class="mode-pill">
-        <span class="pill accent">Fleet Board layout</span>
+        <span class="pill accent">Fleet layout</span>
         <span class="pill-hint">90-day inspection queue · status filters</span>
         <button class="btn btn-ghost btn-sm" type="button" id="switchGenericFromFleet">Switch to generic</button>
       </div>
@@ -189,7 +189,7 @@
     <footer class="app-footer">
       <div class="footer-credit">Created by <span>Jorge Guerra</span></div>
       <div class="footer-disclaimer">
-        Fleet Board reads your workbook only in this browser. Data stays on this computer and is never uploaded.
+        Dashboard reads your workbook only in this browser. Data stays on this computer and is never uploaded.
         Use for operational awareness — confirm dates against the source file before action.
       </div>
       <div class="footer-links">

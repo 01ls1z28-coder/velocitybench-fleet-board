@@ -1,4 +1,4 @@
-# Fleet Board — VERIFY (Phase 2)
+# Dashboard — VERIFY (Phase 2)
 
 ## Tip
 
@@ -20,7 +20,7 @@
 | **Generic mode DEFAULT:** sheet picker, header row → columns, type infer (`number`/`date`/`text`/`category`) | Yes (`js/generic.js`) |
 | Auto KPIs: row count; numeric sum/avg/min/max (≤4); date overdue/≤7d/≤30d; category top chips | Yes |
 | Searchable table + sortable headers + column show/hide (`localStorage` by header hash) | Yes |
-| **Fleet preset:** detect Unit#/Reg.Exp/90-day → CTA “Use Fleet layout”; v1 KPIs/queue/drawer/mapper kept | Yes (`js/fleet.js`) |
+| **Fleet layout preset:** detect Unit#/Reg.Exp/90-day → CTA “Use Fleet layout”; v1 KPIs/queue/drawer/mapper kept | Yes (`js/fleet.js`) |
 | Default remains Generic until user opts in; choice remembered | Yes |
 | Hub brass/dark chrome | Yes |
 | Credits: **Created by Jorge Guerra** only | Yes |

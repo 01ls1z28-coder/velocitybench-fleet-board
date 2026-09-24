@@ -1,4 +1,4 @@
-/* VelocityBench Fleet Board — shell: FSA, IndexedDB, mode routing */
+/* VelocityBench Dashboard — shell: FSA, IndexedDB, mode routing */
 (function () {
   "use strict";
 
