@@ -2,7 +2,7 @@
 
 ## Tip
 
-- **SHA (full):** `(stamp after push)`
+- **SHA (full):** `c0eefc57536b39d6cc05412a0553baed8abb2656`
 - **Branch:** `review/fleet-board-phase2`
 - **Repo:** https://github.com/01ls1z28-coder/velocitybench-fleet-board
 - **Pages (after review CLEAR / deploy):** https://01ls1z28-coder.github.io/velocitybench-fleet-board/
