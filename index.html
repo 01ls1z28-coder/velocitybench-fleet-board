@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="VelocityBench Fleet Board — local Excel fleet dashboard. Data stays in your browser." />
+  <meta name="description" content="VelocityBench Fleet Board — local Excel dashboard from your headers. Data stays in your browser." />
   <title>Fleet Board — VelocityBench</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="vendor/xlsx.full.min.js"></script>
@@ -24,7 +24,10 @@
     </header>
 
     <div class="menu hidden" id="menu">
-      <button type="button" id="remapBtn">Match columns</button>
+      <button type="button" id="remapBtn" class="fleet-only hidden">Match columns</button>
+      <button type="button" id="colsBtn" class="generic-only hidden">Show / hide columns</button>
+      <button type="button" id="useGenericBtn" class="fleet-only hidden">Use generic layout</button>
+      <button type="button" id="useFleetBtn" class="generic-only hidden">Use Fleet Board layout</button>
       <button type="button" id="chooseOtherBtn">Open another file</button>
       <button type="button" id="chooseExportBtn">Choose export copy</button>
     </div>
@@ -50,43 +53,109 @@
       </div>
     </div>
 
+    <div id="fleetSuggest" class="banner info hidden" role="status">
+      <div class="banner-text">
+        <strong>Fleet workbook detected.</strong>
+        Headers look like Unit# / Reg.Exp / 90-day inspection. Stay on the generic dashboard, or switch to the Fleet Board layout.
+      </div>
+      <div class="banner-actions">
+        <button class="btn btn-primary" type="button" id="acceptFleetBtn">Use Fleet layout</button>
+        <button class="btn" type="button" id="dismissFleetBtn">Keep generic</button>
+      </div>
+    </div>
+
     <section id="loader">
       <div class="hero-drop" id="drop">
-        <h2>Open the fleet workbook</h2>
-        <p>Choose an Excel or CSV file on this computer. Nothing is uploaded — the workbook is read only in this browser.</p>
+        <h2>Open a workbook</h2>
+        <p>Choose any Excel or CSV file on this computer. The dashboard is built from your header row — nothing is uploaded.</p>
         <button class="btn btn-primary cta" id="pickBtn" type="button">Choose file</button>
         <input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
-        <p class="privacy-note">Practice with <code>sample-fleet.xlsx</code> in this folder. Chrome or Edge recommended for live Refresh.</p>
+        <p class="privacy-note">Practice with <code>sample-fleet.xlsx</code> or <code>sample-orders.xlsx</code>. Chrome or Edge recommended for live Refresh.</p>
       </div>
     </section>
 
+    <!-- Fleet column mapper (preset only) -->
     <section id="setup" class="setup hidden">
       <div class="panel">
         <h3>Match columns</h3>
-        <label style="color:var(--text-muted); font-size:12px; display:block; margin-bottom:10px">Sheet
-          <select id="sheetSelect" style="margin-top:4px; display:block; max-width:320px"></select>
+        <label class="sheet-label">Sheet
+          <select id="sheetSelectFleet"></select>
         </label>
         <div class="map-grid" id="mapGrid"></div>
         <div class="setup-actions">
-          <button class="btn btn-primary" id="applyMap" type="button">Show dashboard</button>
+          <button class="btn btn-primary" id="applyMap" type="button">Show fleet dashboard</button>
+          <button class="btn btn-ghost" id="setupGenericBtn" type="button">Use generic layout instead</button>
         </div>
       </div>
     </section>
 
-    <section id="board" class="hidden">
-      <div class="live-bar" id="liveBar">
+    <!-- Generic mode board (DEFAULT) -->
+    <section id="boardGeneric" class="hidden">
+      <div class="live-bar" id="liveBarGeneric">
         <div class="live-meta">
-          <div class="file-name" id="fileName">—</div>
-          <div class="file-hint" id="fileHint">Local workbook</div>
+          <div class="file-name" id="fileNameGeneric">—</div>
+          <div class="file-hint" id="fileHintGeneric">Local workbook</div>
+        </div>
+        <div class="live-controls">
+          <label class="sheet-inline">Sheet
+            <select id="sheetSelectGeneric"></select>
+          </label>
+          <label class="toggle" title="Poll lastModified while this tab is visible">
+            <input type="checkbox" id="autoCheckGeneric" checked />
+            Auto-check
+          </label>
+          <button class="btn" type="button" id="refreshBtnGeneric">Refresh</button>
+          <button class="btn btn-ghost" type="button" id="colsBoardBtn">Columns</button>
+        </div>
+      </div>
+
+      <div class="mode-pill" id="modePillGeneric">
+        <span class="pill">Generic layout</span>
+        <span class="pill-hint" id="genericHint">Dashboard from header row · types inferred</span>
+      </div>
+
+      <div class="kpis" id="kpisGeneric"></div>
+      <div class="cat-chips" id="catChips"></div>
+
+      <div class="panel">
+        <div class="toolbar">
+          <input type="search" id="searchGeneric" placeholder="Search all visible columns…" autocomplete="off" />
+          <div class="col-panel hidden" id="colPanel">
+            <div class="col-panel-title">Visible columns</div>
+            <div id="colChecks"></div>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="theadGeneric"></thead>
+            <tbody id="tbodyGeneric"></tbody>
+          </table>
+        </div>
+        <div class="table-foot" id="tableFootGeneric"></div>
+      </div>
+    </section>
+
+    <!-- Fleet preset board -->
+    <section id="boardFleet" class="hidden">
+      <div class="live-bar" id="liveBarFleet">
+        <div class="live-meta">
+          <div class="file-name" id="fileNameFleet">—</div>
+          <div class="file-hint" id="fileHintFleet">Local workbook</div>
         </div>
         <div class="live-controls">
           <label class="toggle" title="Poll lastModified while this tab is visible">
-            <input type="checkbox" id="autoCheck" checked />
+            <input type="checkbox" id="autoCheckFleet" checked />
             Auto-check
           </label>
-          <button class="btn" type="button" id="refreshBtn">Refresh</button>
+          <button class="btn" type="button" id="refreshBtnFleet">Refresh</button>
           <button class="btn btn-ghost" type="button" id="remapBoardBtn">Match columns</button>
         </div>
+      </div>
+
+      <div class="mode-pill">
+        <span class="pill accent">Fleet Board layout</span>
+        <span class="pill-hint">90-day inspection queue · status filters</span>
+        <button class="btn btn-ghost btn-sm" type="button" id="switchGenericFromFleet">Switch to generic</button>
       </div>
 
       <div class="kpis" id="kpis"></div>
@@ -134,6 +203,8 @@
   <aside class="drawer" id="drawer" aria-live="polite"></aside>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="js/fleet.js"></script>
+  <script src="js/generic.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

@@ -1,6 +1,6 @@
 # VelocityBench Fleet Board
 
-Local Excel → fleet dashboard. Open a workbook on this computer; the browser reads it in place. **Nothing is uploaded.**
+Local Excel → flexible dashboard. Open any workbook on this computer; the browser builds KPIs and a table from your **header row**. **Nothing is uploaded.**
 
 **Created by Jorge Guerra.**
 
@@ -12,17 +12,13 @@ Hub: [velocitybench.com](https://velocitybench.com/) · Bench: [velocitybench.co
 
 ## Features
 
-- File System Access API (Chrome/Edge): keep a live file handle, **Refresh**, and optional auto-check while the tab is visible
+- **Generic layout (default):** any `.xlsx` / `.xls` / `.csv` → inferred column types, auto KPIs, searchable/sortable table, column show/hide
+- **Fleet Board preset (optional):** detect Unit# / Reg.Exp / 90-day headers → v1 KPIs, 90-day queue, drawer, status filters, column mapper
+- File System Access API (Chrome/Edge): live file handle, **Refresh**, Auto-check while the tab is visible
 - IndexedDB persistence of the file handle (re-permission on reopen when the browser allows)
 - Fallback file picker + drag-drop for Safari/Firefox (refresh re-prompts)
 - Excel lock banner on Windows when the .xlsx is open in Excel, with **Retry** and **Choose export copy**
-- Column mapper (aliases + `localStorage` map key `fleetboard-map-v3`)
-- KPIs, 90-day due queue (≤45 days), search/filters, unit drawer
-- Vendored SheetJS (`vendor/xlsx.full.min.js`) + `sample-fleet.xlsx` for practice
-
-## Expected columns
-
-Unit#, Year, MAKE/MODEL, license#, Vehicle ID#, Reg.Exp, 90 day (insp. Due), Driver, Notes
+- Vendored SheetJS (`vendor/xlsx.full.min.js`) + `sample-fleet.xlsx` / `sample-orders.xlsx` for practice
 
 ## Run
 

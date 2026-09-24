@@ -1,45 +1,33 @@
-/* VelocityBench Fleet Board — local Excel dashboard (browser-only) */
+/* VelocityBench Fleet Board — shell: FSA, IndexedDB, mode routing */
 (function () {
   "use strict";
 
-  const FIELDS = [
-    { key: "id", label: "Unit#", aliases: ["unit#", "unit #", "unit no", "unit number", "unit"] },
-    { key: "year", label: "Year", aliases: ["year"] },
-    { key: "make", label: "MAKE/MODEL", aliases: ["make/model", "make model", "make", "model", "description"] },
-    { key: "plate", label: "license#", aliases: ["license#", "license #", "license", "plate", "tag"] },
-    { key: "vid", label: "Vehicle ID#", aliases: ["vehicle id#", "vehicle id", "veh id", "vin"] },
-    { key: "reg", label: "Reg.Exp", aliases: ["reg.exp", "reg exp", "registration", "reg"] },
-    { key: "insp", label: "90 day (insp. Due)", aliases: ["90 day", "insp", "inspection", "90 day insp"] },
-    { key: "driver", label: "Driver", aliases: ["driver", "assigned", "operator"] },
-    { key: "notes", label: "Notes", aliases: ["notes", "note", "comments"] }
-  ];
-  const MAP_KEY = "fleetboard-map-v3";
   const IDB_NAME = "fleetboard-fsa-v1";
   const IDB_STORE = "handles";
   const IDB_KEY = "workbook";
   const POLL_MS = 4000;
+  const MODE_KEY_PREFIX = FleetBoardGeneric.MODE_KEY_PREFIX;
+  const DISMISS_KEY_PREFIX = "fleetboard-fleet-dismiss-v1:";
 
   const state = {
     wb: null,
     rows: [],
     headers: [],
-    map: {},
     sheet: "",
-    filter: "",
-    search: "",
-    selected: -1,
+    mode: "generic", /* generic | fleet */
     fileHandle: null,
     fileName: "",
     lastModified: 0,
     supportsFsa: typeof window.showOpenFilePicker === "function",
     autoCheck: true,
     pollTimer: null,
-    locked: false
+    locked: false,
+    headerHash: ""
   };
 
   const $ = (id) => document.getElementById(id);
 
-  /* ── IndexedDB handle persist (hand-roll) ── */
+  /* ── IndexedDB handle persist ── */
   function idbOpen() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(IDB_NAME, 1);
@@ -124,20 +112,87 @@
     $("fsaHint").classList.toggle("hidden", !show);
   }
 
-  function updateLiveMeta() {
-    $("fileName").textContent = state.fileName || "Workbook";
+  function setFleetSuggest(show) {
+    $("fleetSuggest").classList.toggle("hidden", !show);
+  }
+
+  function updateLiveMeta(which) {
+    const nameId = which === "fleet" ? "fileNameFleet" : "fileNameGeneric";
+    const hintId = which === "fleet" ? "fileHintFleet" : "fileHintGeneric";
+    $(nameId).textContent = state.fileName || "Workbook";
+    let hint = "Local workbook";
     if (state.supportsFsa && state.fileHandle) {
-      $("fileHint").textContent = "Live file handle · Chrome/Edge Refresh";
+      hint = "Live file handle · Chrome/Edge Refresh";
     } else if (state.fileName) {
-      $("fileHint").textContent = "Fallback mode · re-choose file to refresh";
-    } else {
-      $("fileHint").textContent = "Local workbook";
+      hint = "Fallback mode · re-choose file to refresh";
     }
+    $(hintId).textContent = hint;
+    /* keep both in sync */
+    $("fileNameFleet").textContent = state.fileName || "Workbook";
+    $("fileNameGeneric").textContent = state.fileName || "Workbook";
+    $("fileHintFleet").textContent = hint;
+    $("fileHintGeneric").textContent = hint;
+  }
+
+  function syncMenuMode(mode) {
+    state.mode = mode;
+    document.querySelectorAll(".fleet-only").forEach((el) => {
+      el.classList.toggle("hidden", mode !== "fleet");
+    });
+    document.querySelectorAll(".generic-only").forEach((el) => {
+      el.classList.toggle("hidden", mode !== "generic");
+    });
+  }
+
+  function saveModePreference(mode) {
+    if (!state.headerHash) return;
+    try {
+      localStorage.setItem(MODE_KEY_PREFIX + state.headerHash, mode);
+    } catch (_) { /* ignore */ }
+  }
+
+  function loadModePreference() {
+    if (!state.headerHash) return null;
+    try {
+      return localStorage.getItem(MODE_KEY_PREFIX + state.headerHash);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function wasDismissed() {
+    try {
+      return localStorage.getItem(DISMISS_KEY_PREFIX + state.headerHash) === "1";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  function setDismissed() {
+    try {
+      localStorage.setItem(DISMISS_KEY_PREFIX + state.headerHash, "1");
+    } catch (_) { /* ignore */ }
   }
 
   function showToastUpdated() {
     toast("Updated — refreshed");
   }
+
+  /* ── Shared API for modules ── */
+  const api = {
+    getHeaders: () => state.headers,
+    getRows: () => state.rows,
+    updateLiveMeta,
+    syncMenuMode,
+    useSheet,
+    afterSheetChange: () => {
+      state.headerHash = FleetBoardGeneric.headerHash(state.headers);
+      maybeSuggestFleet();
+    }
+  };
+
+  const fleet = FleetBoardFleet.create(api);
+  const generic = FleetBoardGeneric.create(api);
 
   /* ── File pick / load ── */
   async function pickWithFsa() {
@@ -171,7 +226,6 @@
         return;
       } catch (err) {
         if (err && err.name === "AbortError") return;
-        /* fall through to input */
       }
     }
     pickWithInput();
@@ -184,16 +238,13 @@
       setLockBanner(false);
       state.fileName = file.name;
       state.lastModified = file.lastModified;
-      updateLiveMeta();
+      updateLiveMeta(state.mode);
       const buf = await file.arrayBuffer();
       await parseWorkbook(buf, { toastOnSuccess: !!opts.toastOnSuccess });
       startPoll();
       return true;
     } catch (err) {
       setLockBanner(true);
-      if (!opts.silent) {
-        /* banner already shown */
-      }
       return false;
     }
   }
@@ -202,7 +253,7 @@
     state.fileHandle = null;
     state.fileName = file.name || "workbook";
     state.lastModified = file.lastModified || 0;
-    updateLiveMeta();
+    updateLiveMeta(state.mode);
     setFsaHint(!state.supportsFsa);
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -216,22 +267,107 @@
     reader.readAsArrayBuffer(file);
   }
 
+  function fillSheetSelects() {
+    const opts = state.wb.SheetNames.map(
+      (n) => `<option value="${n.replace(/"/g, "&quot;")}">${n.replace(/</g, "&lt;")}</option>`
+    ).join("");
+    $("sheetSelectGeneric").innerHTML = opts;
+    $("sheetSelectFleet").innerHTML = opts;
+    $("sheetSelectGeneric").value = state.sheet;
+    $("sheetSelectFleet").value = state.sheet;
+  }
+
   async function parseWorkbook(buf, opts) {
     opts = opts || {};
     try {
       state.wb = XLSX.read(buf, { type: "array", cellDates: true });
-      $("sheetSelect").innerHTML = state.wb.SheetNames.map((n) =>
-        `<option>${escapeHtml(n)}</option>`
-      ).join("");
       $("loader").classList.add("hidden");
       setLockBanner(false);
-      useSheet(state.wb.SheetNames[0]);
-      buildBoard();
+      const keepSheet =
+        state.sheet && state.wb.SheetNames.includes(state.sheet)
+          ? state.sheet
+          : state.wb.SheetNames[0];
+      useSheet(keepSheet);
+      fillSheetSelects();
+      routeAfterLoad();
       if (opts.toastOnSuccess) showToastUpdated();
     } catch (err) {
       alert("Could not read that file.\n" + (err && err.message ? err.message : err));
       throw err;
     }
+  }
+
+  function useSheet(name) {
+    state.sheet = name;
+    const data = XLSX.utils.sheet_to_json(state.wb.Sheets[name], {
+      header: 1,
+      defval: "",
+      raw: false
+    });
+    const headerIdx = data.findIndex((r) => r.some((c) => String(c).trim() !== ""));
+    if (headerIdx < 0) {
+      state.headers = [];
+      state.rows = [];
+      state.headerHash = "";
+      return;
+    }
+    state.headers = data[headerIdx].map((h) => String(h).trim());
+    state.rows = data
+      .slice(headerIdx + 1)
+      .filter((r) => r.some((c) => String(c).trim() !== ""))
+      .map((r) => {
+        const o = {};
+        state.headers.forEach((h, i) => {
+          o[h] = r[i] == null ? "" : r[i];
+        });
+        return o;
+      });
+    state.headerHash = FleetBoardGeneric.headerHash(state.headers);
+  }
+
+  function maybeSuggestFleet() {
+    const isFleet = FleetBoardFleet.looksLikeFleet(state.headers);
+    if (
+      state.mode === "generic" &&
+      isFleet &&
+      loadModePreference() !== "fleet" &&
+      !wasDismissed()
+    ) {
+      setFleetSuggest(true);
+    } else {
+      setFleetSuggest(false);
+    }
+  }
+
+  function routeAfterLoad() {
+    const pref = loadModePreference();
+    const isFleet = FleetBoardFleet.looksLikeFleet(state.headers);
+
+    if (pref === "fleet" && isFleet) {
+      enterFleet({ skipMapper: true });
+      setFleetSuggest(false);
+      return;
+    }
+
+    /* Default: generic — even on fleet files until user opts in */
+    enterGeneric();
+    maybeSuggestFleet();
+  }
+
+  function enterGeneric() {
+    state.mode = "generic";
+    saveModePreference("generic");
+    setFleetSuggest(false);
+    fleet.closeDrawer();
+    generic.build();
+  }
+
+  function enterFleet(opts) {
+    opts = opts || {};
+    state.mode = "fleet";
+    saveModePreference("fleet");
+    setFleetSuggest(false);
+    fleet.activate({ skipMapper: !!opts.skipMapper });
   }
 
   async function refreshWorkbook() {
@@ -242,18 +378,19 @@
         toast("Permission needed — choose the workbook again");
         return;
       }
-      const ok = await loadFromHandle(state.fileHandle, { toastOnSuccess: true, silent: false });
+      const ok = await loadFromHandle(state.fileHandle, {
+        toastOnSuccess: true,
+        silent: false
+      });
       if (!ok) return;
       return;
     }
-    /* Fallback browsers: must re-prompt */
     setFsaHint(true);
     toast("This browser can’t keep a live file handle — choose the workbook again");
     pickWithInput();
   }
 
   function chooseExportCopy() {
-    /* Same picker; user Save As / export CSV or XLSX without fighting Excel lock */
     pickFile();
   }
 
@@ -280,7 +417,7 @@
       if (file.lastModified !== state.lastModified) {
         state.lastModified = file.lastModified;
         state.fileName = file.name;
-        updateLiveMeta();
+        updateLiveMeta(state.mode);
         const buf = await file.arrayBuffer();
         await parseWorkbook(buf, { toastOnSuccess: true });
       }
@@ -297,361 +434,12 @@
     }
   });
 
-  /* ── Sheet / mapper (1:1 from Jorge’s test) ── */
-  function useSheet(name) {
-    state.sheet = name;
-    const data = XLSX.utils.sheet_to_json(state.wb.Sheets[name], {
-      header: 1,
-      defval: "",
-      raw: false
-    });
-    const headerIdx = data.findIndex((r) => r.some((c) => String(c).trim() !== ""));
-    state.headers = data[headerIdx].map((h) => String(h).trim());
-    state.rows = data
-      .slice(headerIdx + 1)
-      .filter((r) => r.some((c) => String(c).trim() !== ""))
-      .map((r) => {
-        const o = {};
-        state.headers.forEach((h, i) => {
-          o[h] = r[i] == null ? "" : r[i];
-        });
-        return o;
-      });
-    guessMap();
-    drawMapper();
-  }
-
-  function norm(s) {
-    return String(s || "")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .trim();
-  }
-
-  function guessMap() {
-    const saved = JSON.parse(localStorage.getItem(MAP_KEY) || "{}");
-    state.map = {};
-    FIELDS.forEach((f) => {
-      if (saved[f.key] && state.headers.includes(saved[f.key])) {
-        state.map[f.key] = saved[f.key];
-        return;
-      }
-      const exact = state.headers.find(
-        (h) => norm(h) === norm(f.label) || f.aliases.includes(norm(h))
-      );
-      if (exact) {
-        state.map[f.key] = exact;
-        return;
-      }
-      state.map[f.key] =
-        state.headers.find((h) => f.aliases.some((a) => norm(h).includes(a))) || "";
-    });
-  }
-
-  function drawMapper() {
-    $("mapGrid").innerHTML = FIELDS.map((f) => {
-      const opts = [`<option value="">Not used</option>`]
-        .concat(
-          state.headers.map(
-            (h) =>
-              `<option value="${escapeAttr(h)}" ${
-                state.map[f.key] === h ? "selected" : ""
-              }>${escapeHtml(h)}</option>`
-          )
-        )
-        .join("");
-      return `<label>${escapeHtml(f.label)}<select data-field="${f.key}">${opts}</select></label>`;
-    }).join("");
-    $("mapGrid").querySelectorAll("select").forEach((sel) => {
-      sel.onchange = () => {
-        state.map[sel.dataset.field] = sel.value;
-      };
-    });
-  }
-
-  function val(row, key) {
-    return state.map[key] ? row[state.map[key]] : "";
-  }
-
-  function parseDate(v) {
-    if (!v) return null;
-    if (v instanceof Date && !isNaN(v)) return v;
-    const d = new Date(String(v));
-    return isNaN(d) ? null : d;
-  }
-
-  function daysUntil(d) {
-    const a = new Date();
-    a.setHours(0, 0, 0, 0);
-    const b = new Date(d);
-    b.setHours(0, 0, 0, 0);
-    return Math.round((b - a) / 86400000);
-  }
-
-  function inspInfo(row) {
-    const d = parseDate(val(row, "insp"));
-    return d ? { date: d, n: daysUntil(d) } : null;
-  }
-
-  function regInfo(row) {
-    const d = parseDate(val(row, "reg"));
-    return d ? { date: d, n: daysUntil(d) } : null;
-  }
-
-  function tone(n) {
-    return n < 0 ? "bad" : n <= 7 ? "warn" : n <= 30 ? "warn" : "good";
-  }
-
-  function daysLabel(n) {
-    if (n < 0) return `${-n} days overdue`;
-    if (n === 0) return "Due today";
-    if (n === 1) return "Due tomorrow";
-    return `${n} days left`;
-  }
-
-  function buildBoard() {
-    localStorage.setItem(MAP_KEY, JSON.stringify(state.map));
-    $("setup").classList.add("hidden");
-    $("board").classList.remove("hidden");
-    $("menuBtn").classList.remove("hidden");
-    updateLiveMeta();
-
-    let overdue = 0,
-      week = 0,
-      thirty = 0,
-      missing = 0,
-      regOver = 0;
-    const queue = [];
-    state.rows.forEach((r, idx) => {
-      const insp = inspInfo(r);
-      const reg = regInfo(r);
-      if (!insp) missing += 1;
-      else {
-        if (insp.n < 0) overdue += 1;
-        else if (insp.n <= 7) week += 1;
-        else if (insp.n <= 30) thirty += 1;
-        if (insp.n <= 45) queue.push({ idx, r, insp });
-      }
-      if (reg && reg.n < 0) regOver += 1;
-    });
-    queue.sort((a, b) => a.insp.n - b.insp.n);
-
-    $("kpis").innerHTML = [
-      kpi(
-        "fleet",
-        "Units",
-        state.rows.length,
-        "var(--soft)",
-        `${regOver} registration${regOver === 1 ? "" : "s"} overdue`
-      ),
-      kpi(
-        "insp-overdue",
-        "90-day overdue",
-        overdue,
-        overdue ? "var(--red)" : "var(--good)",
-        "Inspection past due"
-      ),
-      kpi(
-        "insp-week",
-        "Due in 7 days",
-        week,
-        week ? "var(--warn)" : "var(--accent)",
-        "Act this week"
-      ),
-      kpi(
-        "insp-30",
-        "Due in 30 days",
-        thirty,
-        thirty ? "var(--warn)" : "var(--accent)",
-        "On the 90-day horizon"
-      )
-    ].join("");
-    $("kpis").querySelectorAll(".kpi").forEach((el) => {
-      el.onclick = () => {
-        state.filter = el.dataset.kpi === "fleet" ? "" : el.dataset.kpi;
-        $("statusFilter").value = state.filter;
-        renderTable();
-        $("kpis")
-          .querySelectorAll(".kpi")
-          .forEach((k) =>
-            k.classList.toggle("active", k.dataset.kpi === el.dataset.kpi)
-          );
-      };
-    });
-
-    $("dueList").innerHTML =
-      queue
-        .slice(0, 8)
-        .map(
-          ({ idx, r, insp }) => `
-        <div class="q-item" data-idx="${idx}">
-          <div class="days ${tone(insp.n)}">${
-            insp.n < 0 ? "OVERDUE" : insp.n + "d"
-          }</div>
-          <div>
-            <b>Unit ${escapeHtml(String(val(r, "id") || "—"))}</b>
-            <div class="meta">${escapeHtml(String(val(r, "make") || ""))}</div>
-          </div>
-          <div class="meta">${escapeHtml(String(val(r, "driver") || "No driver"))}</div>
-          <div class="meta">${insp.date.toLocaleDateString()}<br>${daysLabel(
-            insp.n
-          )}</div>
-        </div>`
-        )
-        .join("") ||
-      `<div class="meta" style="padding:8px 0">No inspections due in the next 45 days.</div>`;
-    $("dueList").querySelectorAll(".q-item").forEach((el) => {
-      el.onclick = () => openRow(+el.dataset.idx);
-    });
-    renderTable();
-  }
-
-  function kpi(id, label, value, color, hint) {
-    return `<div class="kpi" data-kpi="${id}">
-      <div class="lbl">${label}</div>
-      <div class="num" style="color:${color}">${value}</div>
-      <div class="hint">${hint}</div>
-    </div>`;
-  }
-
-  function visibleRows() {
-    const q = norm(state.search);
-    return state.rows
-      .map((r, idx) => ({ r, idx }))
-      .filter(({ r }) => {
-        const insp = inspInfo(r);
-        const reg = regInfo(r);
-        if (state.filter === "insp-overdue" && !(insp && insp.n < 0)) return false;
-        if (state.filter === "insp-week" && !(insp && insp.n >= 0 && insp.n <= 7))
-          return false;
-        if (state.filter === "insp-30" && !(insp && insp.n >= 0 && insp.n <= 30))
-          return false;
-        if (state.filter === "reg-overdue" && !(reg && reg.n < 0)) return false;
-        if (state.filter === "missing" && insp) return false;
-        if (!q) return true;
-        return ["id", "year", "make", "plate", "vid", "driver", "notes"].some((k) =>
-          norm(val(r, k)).includes(q)
-        );
-      })
-      .sort((a, b) => {
-        const an = inspInfo(a.r),
-          bn = inspInfo(b.r);
-        if (!an && !bn) return 0;
-        if (!an) return 1;
-        if (!bn) return -1;
-        return an.n - bn.n;
-      });
-  }
-
-  function renderTable() {
-    const cols = ["id", "insp", "year", "make", "driver", "reg", "plate", "vid", "notes"].filter(
-      (k) => state.map[k]
-    );
-    const labels = {
-      id: "Unit#",
-      year: "Year",
-      make: "MAKE/MODEL",
-      plate: "License#",
-      vid: "Vehicle ID#",
-      reg: "Reg. Exp",
-      insp: "90 Day Insp.",
-      driver: "Driver",
-      notes: "Notes"
-    };
-    const rows = visibleRows();
-    $("thead").innerHTML =
-      "<tr>" + cols.map((k) => `<th>${labels[k]}</th>`).join("") + "</tr>";
-    $("tbody").innerHTML = rows
-      .map(({ r, idx }) => {
-        const cells = cols
-          .map((k) => {
-            if (k === "insp" || k === "reg") {
-              const info = k === "insp" ? inspInfo(r) : regInfo(r);
-              if (!info)
-                return `<td><span class="chip muted">No date</span></td>`;
-              return `<td><span class="chip ${tone(
-                info.n
-              )}">${info.date.toLocaleDateString()}</span><div class="meta">${daysLabel(
-                info.n
-              )}</div></td>`;
-            }
-            if (k === "make")
-              return `<td class="wrap">${escapeHtml(String(val(r, k) || "—"))}</td>`;
-            if (k === "notes")
-              return `<td class="notes">${escapeHtml(String(val(r, k) || "—"))}</td>`;
-            return `<td>${escapeHtml(String(val(r, k) || "—"))}</td>`;
-          })
-          .join("");
-        return `<tr data-idx="${idx}" class="${
-          state.selected === idx ? "active" : ""
-        }">${cells}</tr>`;
-      })
-      .join("");
-    $("tbody").querySelectorAll("tr").forEach((tr) => {
-      tr.onclick = () => openRow(+tr.dataset.idx);
-    });
-  }
-
-  function openRow(idx) {
-    const r = state.rows[idx];
-    if (!r) return;
-    state.selected = idx;
-    renderTable();
-    const insp = inspInfo(r);
-    const badge = !insp
-      ? ["muted", "No 90-day date"]
-      : [tone(insp.n), daysLabel(insp.n)];
-    const fields = [
-      ["Year", val(r, "year")],
-      ["MAKE/MODEL", val(r, "make")],
-      ["License#", val(r, "plate")],
-      ["Vehicle ID#", val(r, "vid")],
-      [
-        "90 Day Insp.",
-        insp ? `${insp.date.toLocaleDateString()} · ${daysLabel(insp.n)}` : ""
-      ],
-      ["Reg. Exp", fmt(val(r, "reg"))],
-      ["Driver", val(r, "driver") || "Unassigned"],
-      ["Notes", val(r, "notes")]
-    ].filter(([, v]) => v);
-    $("drawer").innerHTML = `
-      <button class="icon-btn" id="closeDrawer" type="button" style="float:right" aria-label="Close">✕</button>
-      <div class="chip ${badge[0]}">${badge[1]}</div>
-      <h2>Unit ${escapeHtml(String(val(r, "id") || ""))}</h2>
-      <div class="kv">${fields
-        .map(([k, v]) => `<span>${k}</span><b>${escapeHtml(String(v))}</b>`)
-        .join("")}</div>`;
-    $("drawer").classList.add("open");
-    $("backdrop").classList.remove("hidden");
-    $("closeDrawer").onclick = closeDrawer;
-  }
-
-  function fmt(v) {
-    const d = parseDate(v);
-    return d ? d.toLocaleDateString() : v;
-  }
-
-  function closeDrawer() {
-    $("drawer").classList.remove("open");
-    $("backdrop").classList.add("hidden");
-  }
-
-  function escapeHtml(s) {
-    return String(s).replace(
-      /[&<>"']/g,
-      (c) =>
-        ({
-          "&": "&amp;",
-          "<": "&lt;",
-          ">": "&gt;",
-          '"': "&quot;",
-          "'": "&#39;"
-        }[c])
-    );
-  }
-
-  function escapeAttr(s) {
-    return escapeHtml(s);
+  function setAutoCheck(on) {
+    state.autoCheck = !!on;
+    $("autoCheckGeneric").checked = state.autoCheck;
+    $("autoCheckFleet").checked = state.autoCheck;
+    if (state.autoCheck) startPoll();
+    else stopPoll();
   }
 
   /* ── Wire UI ── */
@@ -694,35 +482,29 @@
     $("menu").classList.add("hidden");
     chooseExportCopy();
   };
-  $("remapBtn").onclick = () => {
+  $("useFleetBtn").onclick = () => {
     $("menu").classList.add("hidden");
-    $("board").classList.add("hidden");
-    $("setup").classList.remove("hidden");
+    enterFleet({ skipMapper: false });
   };
-  $("remapBoardBtn").onclick = () => {
-    $("board").classList.add("hidden");
-    $("setup").classList.remove("hidden");
+  $("useGenericBtn").onclick = () => {
+    $("menu").classList.add("hidden");
+    enterGeneric();
   };
-  $("applyMap").onclick = buildBoard;
-  $("sheetSelect").onchange = () => useSheet($("sheetSelect").value);
-  $("search").oninput = () => {
-    state.search = $("search").value;
-    renderTable();
+  $("setupGenericBtn").onclick = () => enterGeneric();
+  $("switchGenericFromFleet").onclick = () => enterGeneric();
+  $("acceptFleetBtn").onclick = () => enterFleet({ skipMapper: false });
+  $("dismissFleetBtn").onclick = () => {
+    setDismissed();
+    setFleetSuggest(false);
   };
-  $("statusFilter").onchange = () => {
-    state.filter = $("statusFilter").value;
-    renderTable();
-  };
-  $("backdrop").onclick = closeDrawer;
-  $("refreshBtn").onclick = () => refreshWorkbook();
+
+  $("refreshBtnGeneric").onclick = () => refreshWorkbook();
+  $("refreshBtnFleet").onclick = () => refreshWorkbook();
   $("lockRetryBtn").onclick = () => refreshWorkbook();
   $("lockExportBtn").onclick = () => chooseExportCopy();
   $("fsaRepickBtn").onclick = () => pickFile();
-  $("autoCheck").onchange = (e) => {
-    state.autoCheck = !!e.target.checked;
-    if (state.autoCheck) startPoll();
-    else stopPoll();
-  };
+  $("autoCheckGeneric").onchange = (e) => setAutoCheck(e.target.checked);
+  $("autoCheckFleet").onchange = (e) => setAutoCheck(e.target.checked);
 
   document.addEventListener("click", (e) => {
     if (!$("menu").contains(e.target) && e.target !== $("menuBtn")) {
