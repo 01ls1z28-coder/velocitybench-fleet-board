@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="VelocityBench Fleet Board — local Excel fleet dashboard. Data stays in your browser." />
+  <title>Fleet Board — VelocityBench</title>
+  <link rel="stylesheet" href="css/styles.css" />
+  <script src="vendor/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <div class="brand">
+        <div class="logo-mark" aria-hidden="true">F</div>
+        <div class="brand-text">
+          <div class="logo-text">Fleet Board</div>
+          <div class="logo-badge">VelocityBench Hub</div>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="icon-btn hidden" id="menuBtn" type="button" aria-label="Menu" title="Menu">☰</button>
+      </div>
+    </header>
+
+    <div class="menu hidden" id="menu">
+      <button type="button" id="remapBtn">Match columns</button>
+      <button type="button" id="chooseOtherBtn">Open another file</button>
+      <button type="button" id="chooseExportBtn">Choose export copy</button>
+    </div>
+
+    <div id="lockBanner" class="banner lock hidden" role="alert">
+      <div class="banner-text">
+        <strong>Workbook locked.</strong>
+        Excel may have this .xlsx open on Windows. Close it in Excel, or save a copy and open that instead.
+      </div>
+      <div class="banner-actions">
+        <button class="btn" type="button" id="lockRetryBtn">Retry</button>
+        <button class="btn btn-warn" type="button" id="lockExportBtn">Choose export copy</button>
+      </div>
+    </div>
+
+    <div id="fsaHint" class="banner warn hidden" role="status">
+      <div class="banner-text">
+        <strong>Live file handle unavailable.</strong>
+        This browser can’t keep a live file handle — choose the workbook again to refresh.
+      </div>
+      <div class="banner-actions">
+        <button class="btn btn-primary" type="button" id="fsaRepickBtn">Choose workbook again</button>
+      </div>
+    </div>
+
+    <section id="loader">
+      <div class="hero-drop" id="drop">
+        <h2>Open the fleet workbook</h2>
+        <p>Choose an Excel or CSV file on this computer. Nothing is uploaded — the workbook is read only in this browser.</p>
+        <button class="btn btn-primary cta" id="pickBtn" type="button">Choose file</button>
+        <input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
+        <p class="privacy-note">Practice with <code>sample-fleet.xlsx</code> in this folder. Chrome or Edge recommended for live Refresh.</p>
+      </div>
+    </section>
+
+    <section id="setup" class="setup hidden">
+      <div class="panel">
+        <h3>Match columns</h3>
+        <label style="color:var(--text-muted); font-size:12px; display:block; margin-bottom:10px">Sheet
+          <select id="sheetSelect" style="margin-top:4px; display:block; max-width:320px"></select>
+        </label>
+        <div class="map-grid" id="mapGrid"></div>
+        <div class="setup-actions">
+          <button class="btn btn-primary" id="applyMap" type="button">Show dashboard</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="board" class="hidden">
+      <div class="live-bar" id="liveBar">
+        <div class="live-meta">
+          <div class="file-name" id="fileName">—</div>
+          <div class="file-hint" id="fileHint">Local workbook</div>
+        </div>
+        <div class="live-controls">
+          <label class="toggle" title="Poll lastModified while this tab is visible">
+            <input type="checkbox" id="autoCheck" checked />
+            Auto-check
+          </label>
+          <button class="btn" type="button" id="refreshBtn">Refresh</button>
+          <button class="btn btn-ghost" type="button" id="remapBoardBtn">Match columns</button>
+        </div>
+      </div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="queue">
+        <h3>90-day inspection queue</h3>
+        <div id="dueList"></div>
+      </div>
+
+      <div class="panel">
+        <div class="toolbar">
+          <input type="search" id="search" placeholder="Search unit, driver, plate, notes…" autocomplete="off" />
+          <select id="statusFilter">
+            <option value="">All units</option>
+            <option value="insp-overdue">90-day overdue</option>
+            <option value="insp-week">90-day due in 7 days</option>
+            <option value="insp-30">90-day due in 30 days</option>
+            <option value="reg-overdue">Registration overdue</option>
+            <option value="missing">Missing 90-day date</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead id="thead"></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      <div class="footer-credit">Created by <span>Jorge Guerra</span></div>
+      <div class="footer-disclaimer">
+        Fleet Board reads your workbook only in this browser. Data stays on this computer and is never uploaded.
+        Use for operational awareness — confirm dates against the source file before action.
+      </div>
+      <div class="footer-links">
+        <a href="https://velocitybench.com/" rel="noopener">VelocityBench Hub</a>
+        <a href="https://velocitybench.com/bench/" rel="noopener">Bench</a>
+      </div>
+    </footer>
+  </div>
+
+  <div class="backdrop hidden" id="backdrop"></div>
+  <aside class="drawer" id="drawer" aria-live="polite"></aside>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
