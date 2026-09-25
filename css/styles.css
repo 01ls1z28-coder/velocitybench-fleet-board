@@ -921,14 +921,6 @@ html, body {
   margin-top: 12px;
 }
 
-.kpi-row-units {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  width: 100%;
-  align-items: stretch;
-}
-
 .kpi-divider {
   height: 1px;
   margin: 2px 0 4px;
@@ -948,6 +940,16 @@ html, body {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
+  align-items: stretch;
+}
+
+/* Units row also has .kpi-strip (drag chrome). Override 5-col so only 4 equal slots. */
+.kpi-row-units,
+.kpi-strip.kpi-row-units {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
   align-items: stretch;
 }
 
@@ -1422,13 +1424,15 @@ td.notes {
   .kpi-group-grid { grid-template-columns: 1fr 1fr; }
   .kpi-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .q-item { grid-template-columns: 1fr 1fr; }
-  .kpi-row-units { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-row-units,
+  .kpi-strip.kpi-row-units { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 560px) {
   .kpi-group-grid { grid-template-columns: 1fr; }
   .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .kpi-row-units { grid-template-columns: 1fr; }
+  .kpi-row-units,
+  .kpi-strip.kpi-row-units { grid-template-columns: 1fr; }
   .app { padding: 10px 12px; }
   .live-bar .mode-pill {
     flex: 1 1 100%;
