@@ -918,9 +918,9 @@ html, body {
 
 .kpi-row-units {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 260px));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
   gap: 12px;
-  max-width: 1120px;
+  width: 100%;
 }
 
 .kpi-divider {
@@ -1409,6 +1409,7 @@ td.notes {
   .kpi-group-grid { grid-template-columns: 1fr 1fr; }
   .kpi-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .q-item { grid-template-columns: 1fr 1fr; }
+  .kpi-row-units { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 @media (max-width: 560px) {
@@ -1416,6 +1417,11 @@ td.notes {
   .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-row-units { grid-template-columns: 1fr; }
   .app { padding: 10px 12px; }
+  .live-bar .mode-pill {
+    flex: 1 1 100%;
+    order: 3;
+    justify-content: flex-start;
+  }
 }
 
 /* -- Phase 2: layout extras -- */
@@ -1460,9 +1466,21 @@ td.notes {
 .mode-pill {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 10px;
   flex-wrap: wrap;
-  padding: 4px 2px;
+  padding: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.live-meta {
+  flex: 0 1 auto;
+}
+
+.live-controls {
+  flex: 0 1 auto;
+  margin-left: auto;
 }
 
 .pill {
