@@ -1065,24 +1065,26 @@ html, body {
 
 .kpi.kpi-draggable {
   cursor: grab;
+  -webkit-user-drag: element;
 }
 
 .kpi.kpi-draggable:active {
   cursor: grabbing;
 }
 
+.kpi.kpi-draggable * {
+  -webkit-user-drag: none;
+}
+
 .kpi.kpi-fixed {
   cursor: pointer;
 }
 
-.kpi.dragging {
-  opacity: 0.35;
-}
-
-/* Applied after dragstart via setTimeout so native DnD is not cancelled. */
+.kpi.dragging,
 .kpi.drag-ghost {
   opacity: 0.35;
-  pointer-events: none;
+  /* Never pointer-events:none on the source: Chromium cancels DnD if applied
+     in dragstart, and a setTimeout race past dragend leaves cards dead. */
 }
 
 .kpi.drag-over {

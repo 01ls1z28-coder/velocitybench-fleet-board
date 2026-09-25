@@ -1070,6 +1070,7 @@
       const allowed = allowedIdsForRow(rowKey);
       let dragId = null;
       let didDrag = false;
+      let dragGen = 0;
 
       function clearSlotHighlight() {
         strip.querySelectorAll(".kpi-slot.drag-over").forEach((el) => {
@@ -1077,8 +1078,30 @@
         });
       }
 
-      /* Resolve slot under the pointer. Full-width cards left hit-testing on
-         ev.target / closed-over listeners unreliable (ghost covers neighbors). */
+      function resetCardDragState(el) {
+        if (!el) return;
+        el.classList.remove("dragging", "drag-ghost");
+        try {
+          el.style.pointerEvents = "";
+          el.setAttribute("draggable", "true");
+          el.draggable = true;
+        } catch (_) {
+          /* ignore */
+        }
+      }
+
+      function resetRowDragState() {
+        dragGen += 1;
+        dragId = null;
+        strip.classList.remove("is-dragging");
+        clearSlotHighlight();
+        strip.querySelectorAll(".kpi-slot > .kpi[data-kpi]").forEach(resetCardDragState);
+        setTimeout(() => {
+          didDrag = false;
+        }, 50);
+      }
+
+      /* Resolve slot under pointer; skip in-flight source so hits reach the aimed slot. */
       function slotElFromPoint(clientX, clientY) {
         let list = [];
         try {
@@ -1094,6 +1117,7 @@
         for (let i = 0; i < list.length; i++) {
           const el = list[i];
           if (!el || !el.closest) continue;
+          if (el.closest(".kpi.dragging") || el.closest(".kpi.drag-ghost")) continue;
           const slot = el.closest(".kpi-slot");
           if (
             slot &&
@@ -1113,6 +1137,7 @@
         }
         const t = ev && ev.target;
         if (!t || !t.closest) return null;
+        if (t.closest(".kpi.dragging") || t.closest(".kpi.drag-ghost")) return null;
         const slot = t.closest(".kpi-slot");
         if (
           !slot ||
@@ -1150,28 +1175,32 @@
         ev.preventDefault();
         ev.stopPropagation();
         const id = readDragId(ev);
-        clearSlotHighlight();
-        strip.classList.remove("is-dragging");
         const target = slotElFromEvent(ev);
-        if (!target) return;
-        const idx = parseInt(target.getAttribute("data-slot"), 10);
+        const idx = target ? parseInt(target.getAttribute("data-slot"), 10) : NaN;
+        resetRowDragState();
         if (!acceptsDrag(id) || isNaN(idx)) return;
         placeCardInSlot(id, rowKey, idx);
       }
 
-      strip.querySelectorAll(".kpi.kpi-draggable").forEach((el) => {
+      strip.querySelectorAll(".kpi-slot > .kpi[data-kpi]").forEach((el) => {
+        const id = el.getAttribute("data-kpi") || el.dataset.kpi;
+        if (!acceptsDrag(id)) return;
+        el.classList.remove("kpi-fixed", "dragging", "drag-ghost");
+        el.classList.add("kpi-draggable");
+        resetCardDragState(el);
+
         el.addEventListener("dragstart", (ev) => {
-          dragId = el.dataset.kpi;
+          dragId = el.getAttribute("data-kpi") || el.dataset.kpi;
           if (!acceptsDrag(dragId)) {
             dragId = null;
             try {
               ev.preventDefault();
             } catch (_) { /* ignore */ }
+            resetCardDragState(el);
             return;
           }
           didDrag = false;
-          /* Opacity only during dragstart. pointer-events:none on .drag-ghost
-             is deferred - applying it here cancels Chromium native DnD. */
+          const gen = ++dragGen;
           el.classList.add("dragging");
           strip.classList.add("is-dragging");
           try {
@@ -1181,34 +1210,31 @@
             /* Edge file:// */
           }
           setTimeout(() => {
+            if (gen !== dragGen) return;
+            if (!el.classList.contains("dragging")) return;
             didDrag = true;
             el.classList.add("drag-ghost");
           }, 0);
         });
         el.addEventListener("dragend", () => {
-          el.classList.remove("dragging", "drag-ghost");
-          strip.classList.remove("is-dragging");
-          clearSlotHighlight();
-          dragId = null;
-          setTimeout(() => {
-            didDrag = false;
-          }, 50);
+          resetRowDragState();
         });
         el.onclick = (ev) => {
-          if (didDrag || el.classList.contains("dragging")) {
+          if (didDrag || el.classList.contains("dragging") || el.classList.contains("drag-ghost")) {
             ev.preventDefault();
             ev.stopPropagation();
+            resetCardDragState(el);
             return;
           }
-          const id = el.dataset.kpi;
-          setFilter(id === "fleet" ? "" : id);
+          const kpiId = el.getAttribute("data-kpi") || el.dataset.kpi;
+          setFilter(kpiId === "fleet" ? "" : kpiId);
         };
         el.onkeydown = (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
             if (!didDrag) {
-              const id = el.dataset.kpi;
-              setFilter(id === "fleet" ? "" : id);
+              const kpiId = el.getAttribute("data-kpi") || el.dataset.kpi;
+              setFilter(kpiId === "fleet" ? "" : kpiId);
             }
           }
         };
@@ -1216,7 +1242,7 @@
 
       function armSlot(slot) {
         slot.addEventListener("dragover", (ev) => {
-          if (!acceptsDrag(dragId) && !acceptsDrag(readDragId(ev))) return;
+          if (!acceptsDrag(dragId)) return;
           ev.preventDefault();
           ev.stopPropagation();
           try {
@@ -1227,14 +1253,13 @@
           highlightSlot(ev);
         });
         slot.addEventListener("dragenter", (ev) => {
-          if (!acceptsDrag(dragId) && !acceptsDrag(readDragId(ev))) return;
+          if (!acceptsDrag(dragId)) return;
           ev.preventDefault();
           highlightSlot(ev);
         });
         slot.addEventListener("dragleave", (ev) => {
           const related = ev.relatedTarget;
           if (related && slot.contains(related)) return;
-          /* Only clear if pointer left this slot for a non-slot / other slot. */
           const still = slotElFromEvent(ev);
           if (still === slot) return;
           slot.classList.remove("drag-over");
@@ -1244,9 +1269,8 @@
 
       strip.querySelectorAll(".kpi-slot").forEach(armSlot);
 
-      /* Strip-level fallback: drop between gaps / when child misses. */
       strip.addEventListener("dragover", (ev) => {
-        if (!acceptsDrag(dragId) && !acceptsDrag(readDragId(ev))) return;
+        if (!acceptsDrag(dragId)) return;
         if (!slotElFromEvent(ev)) return;
         ev.preventDefault();
         try {
