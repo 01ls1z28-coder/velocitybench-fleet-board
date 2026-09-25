@@ -944,6 +944,61 @@ html, body {
   align-items: stretch;
 }
 
+.kpi-slot {
+  min-width: 0;
+  min-height: 96px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: border-color 0.12s, box-shadow 0.12s, background 0.12s;
+  display: flex;
+  flex-direction: column;
+}
+
+.kpi-slot > .kpi {
+  flex: 1;
+  height: 100%;
+}
+
+.kpi-slot-vacant {
+  border: 1px dashed var(--panel-border-strong);
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.kpi-strip.is-dragging .kpi-slot {
+  border-color: var(--panel-border);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.kpi-strip.is-dragging .kpi-slot-vacant {
+  border-style: dashed;
+  border-color: var(--trim);
+}
+
+.kpi-slot.drag-over {
+  border: 1px solid var(--active-border) !important;
+  box-shadow: 0 0 0 2px var(--trim-soft), var(--shadow-card);
+  background: var(--accent-soft);
+}
+
+.kpi-slot-empty {
+  flex: 1;
+  min-height: 96px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px;
+  pointer-events: none;
+}
+
+.kpi-slot-empty .lbl {
+  color: var(--text-dim);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+}
+
 .kpi-group {
   display: flex;
   flex-direction: column;

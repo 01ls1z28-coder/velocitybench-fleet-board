@@ -76,7 +76,7 @@
       "reg-60",
       "reg-90"
     ];
-    /* Units (fleet) is fixed on top; kpiOrder persists only horizon cards. */
+    /* Units (fleet) is fixed on top; kpiSlots persists horizon card boxes. */
     const REORDERABLE_KPI_IDS = KPI_IDS.filter((id) => id !== "fleet");
     const DEFAULT_KPI_ORDER = REORDERABLE_KPI_IDS.slice();
     const THEME_IDS = [
@@ -119,7 +119,7 @@
         groups: { inspection: true, registration: true },
         columns: {},
         showQueue: true,
-        kpiOrder: DEFAULT_KPI_ORDER.slice(),
+        kpiSlots: defaultKpiSlots(),
         theme: DEFAULT_THEME
       };
     }
@@ -148,11 +148,12 @@
     }
 
     function normalizeKpiOrder(order) {
+      /* Packed visible order helper (legacy + Reset packing). */
       const seen = new Set();
       const out = [];
       if (Array.isArray(order)) {
         order.forEach((id) => {
-          if (id === "fleet") return; /* Units fixed; never in reorder list */
+          if (id === "fleet") return;
           if (REORDERABLE_KPI_IDS.indexOf(id) >= 0 && !seen.has(id)) {
             seen.add(id);
             out.push(id);
@@ -166,6 +167,81 @@
         }
       });
       return out;
+    }
+
+    const KPI_SLOT_COUNT = REORDERABLE_KPI_IDS.length;
+
+    function defaultKpiSlots() {
+      /* Default: packed default order into fixed slots (no empties). */
+      return DEFAULT_KPI_ORDER.slice();
+    }
+
+    function normalizeKpiSlots(slots, legacyOrder) {
+      /* Fixed-length slot map: kpiId or null. Allows empty slots; no auto-repack. */
+      const n = KPI_SLOT_COUNT;
+      const out = [];
+      for (let i = 0; i < n; i++) out.push(null);
+      const seen = new Set();
+
+      function tryPlace(id, prefer) {
+        if (!id || id === "fleet") return;
+        if (REORDERABLE_KPI_IDS.indexOf(id) < 0) return;
+        if (seen.has(id)) return;
+        let idx = typeof prefer === "number" ? prefer : -1;
+        if (idx < 0 || idx >= n || out[idx] != null) {
+          idx = out.indexOf(null);
+        }
+        if (idx < 0) return;
+        out[idx] = id;
+        seen.add(id);
+      }
+
+      if (Array.isArray(slots)) {
+        slots.forEach((id, i) => {
+          if (id == null || id === "" || id === "empty") return;
+          tryPlace(id, i < n ? i : -1);
+        });
+      } else if (Array.isArray(legacyOrder)) {
+        legacyOrder.forEach((id) => tryPlace(id, -1));
+      } else {
+        DEFAULT_KPI_ORDER.forEach((id) => tryPlace(id, -1));
+      }
+      return out;
+    }
+
+    function syncSlotsWithVisibility() {
+      /* Hidden cards free their slot (stable grid; empties stay). Newly shown
+         cards take the first empty slot so toggling back prefers the same box
+         when nothing else claimed it. */
+      const slots = normalizeKpiSlots(state.layout.kpiSlots);
+      REORDERABLE_KPI_IDS.forEach((id) => {
+        const idx = slots.indexOf(id);
+        if (!isKpiVisible(id)) {
+          if (idx >= 0) slots[idx] = null;
+        } else if (idx < 0) {
+          const empty = slots.indexOf(null);
+          if (empty >= 0) slots[empty] = id;
+        }
+      });
+      state.layout.kpiSlots = slots;
+      return slots;
+    }
+
+    function placeCardInSlot(dragId, targetSlotIndex) {
+      if (!dragId || dragId === "fleet") return false;
+      const slots = normalizeKpiSlots(state.layout.kpiSlots);
+      const from = slots.indexOf(dragId);
+      if (from < 0) return false;
+      const to = targetSlotIndex | 0;
+      if (to < 0 || to >= slots.length) return false;
+      if (from === to) return false;
+      const other = slots[to]; /* null = empty; else swap */
+      slots[to] = dragId;
+      slots[from] = other;
+      state.layout.kpiSlots = slots;
+      persistView();
+      buildBoard();
+      return true;
     }
 
     const state = {
@@ -273,7 +349,7 @@
               groups: Object.assign({}, state.layout.groups),
               columns: Object.assign({}, state.layout.columns),
               showQueue: !!state.layout.showQueue,
-              kpiOrder: normalizeKpiOrder(state.layout.kpiOrder),
+              kpiSlots: normalizeKpiSlots(state.layout.kpiSlots),
               theme: normalizeTheme(state.layout.theme)
             }
           })
@@ -312,7 +388,14 @@
       if (typeof savedLayout.showQueue === "boolean") {
         base.showQueue = savedLayout.showQueue;
       }
-      base.kpiOrder = normalizeKpiOrder(savedLayout.kpiOrder);
+      if (Array.isArray(savedLayout.kpiSlots)) {
+        base.kpiSlots = normalizeKpiSlots(savedLayout.kpiSlots);
+      } else if (Array.isArray(savedLayout.kpiOrder)) {
+        /* Migrate legacy packed kpiOrder into fixed slots. */
+        base.kpiSlots = normalizeKpiSlots(null, savedLayout.kpiOrder);
+      } else {
+        base.kpiSlots = defaultKpiSlots();
+      }
       base.theme = normalizeTheme(savedLayout.theme);
       base.kpis.fleet = true; /* Units always on top */
       state.layout = base;
@@ -611,7 +694,7 @@
         });
       });
 
-      const clickHint = "Click to filter - drag to rearrange";
+      const clickHint = "Click to filter - drop onto a slot";
       function toneColor(id, n) {
         if (id.indexOf("overdue") >= 0) return n ? "var(--red)" : "var(--good)";
         return n ? "var(--warn)" : "var(--good)";
@@ -700,8 +783,8 @@
         }
       };
 
-      state.layout.kpiOrder = normalizeKpiOrder(state.layout.kpiOrder);
       applyTheme(state.layout.theme);
+      const slots = syncSlotsWithVisibility();
 
       const unitsDef = defById.fleet;
       const unitsHtml = kpi(
@@ -714,12 +797,24 @@
         { fixed: true }
       );
 
-      const visibleOrder = state.layout.kpiOrder.filter((id) => isKpiVisible(id));
-      const cardsHtml = visibleOrder
-        .map((id) => {
-          const d = defById[id];
-          if (!d) return "";
-          return kpi(id, d.cat, d.horizon, d.value, d.color, d.hint, { fixed: false });
+      const slotsHtml = slots
+        .map((id, slotIndex) => {
+          const d = id ? defById[id] : null;
+          const showCard = !!(d && isKpiVisible(id));
+          const inner = showCard
+            ? kpi(id, d.cat, d.horizon, d.value, d.color, d.hint, { fixed: false })
+            : '<div class="kpi-slot-empty" aria-hidden="true"><div class="lbl">Empty slot</div></div>';
+          return (
+            '<div class="kpi-slot' +
+            (showCard ? "" : " kpi-slot-vacant") +
+            '" data-slot="' +
+            slotIndex +
+            '" data-kpi-slot="' +
+            (showCard ? id : "") +
+            '">' +
+            inner +
+            "</div>"
+          );
         })
         .join("");
 
@@ -728,8 +823,8 @@
         unitsHtml +
         "</div>" +
         '<hr class="kpi-divider" aria-hidden="true" />' +
-        '<div class="kpi-strip" id="kpiStrip" aria-label="Horizon KPI cards - drag to rearrange">' +
-        cardsHtml +
+        '<div class="kpi-strip" id="kpiStrip" aria-label="Horizon KPI slots - drop a card into a box">' +
+        slotsHtml +
         "</div>";
 
       wireKpiInteractions();
@@ -757,92 +852,28 @@
       });
     }
 
-    function reorderKpiOrder(dragId, beforeId) {
-      if (!dragId || dragId === "fleet") return;
-      if (beforeId === "fleet") beforeId = null;
-      const order = normalizeKpiOrder(state.layout.kpiOrder).filter((id) => id !== dragId);
-      let insertAt = order.length;
-      if (beforeId) {
-        const idx = order.indexOf(beforeId);
-        if (idx >= 0) insertAt = idx;
-      }
-      order.splice(insertAt, 0, dragId);
-      state.layout.kpiOrder = normalizeKpiOrder(order);
-      persistView();
-      buildBoard();
-    }
-
     function wireKpiInteractions() {
       const strip = $("kpiStrip");
       if (!strip) return;
       let dragId = null;
       let didDrag = false;
-      let placeholder = null;
 
-      function clearPlaceholder() {
-        if (placeholder && placeholder.parentNode) {
-          placeholder.parentNode.removeChild(placeholder);
-        }
-        placeholder = null;
-        strip.querySelectorAll(".kpi.drag-over").forEach((el) => {
+      function clearSlotHighlight() {
+        strip.querySelectorAll(".kpi-slot.drag-over").forEach((el) => {
           el.classList.remove("drag-over");
         });
       }
 
-      function ensurePlaceholder() {
-        if (placeholder) return placeholder;
-        placeholder = document.createElement("div");
-        placeholder.className = "kpi kpi-placeholder";
-        placeholder.setAttribute("aria-hidden", "true");
-        placeholder.innerHTML = '<div class="lbl">Drop here</div>';
-        return placeholder;
+      function slotElFromEvent(ev) {
+        const t = ev.target;
+        if (!t || !t.closest) return null;
+        return t.closest(".kpi-slot");
       }
 
-      function slotBeforeFromPoint(clientX, clientY) {
-        const cards = Array.prototype.slice.call(
-          strip.querySelectorAll(".kpi:not(.kpi-placeholder)")
-        );
-        if (!cards.length) return null;
-        let best = null;
-        let bestDist = Infinity;
-        cards.forEach((el) => {
-          if (el.dataset.kpi === dragId) return;
-          const r = el.getBoundingClientRect();
-          const cx = r.left + r.width / 2;
-          const cy = r.top + r.height / 2;
-          const d =
-            (cx - clientX) * (cx - clientX) + (cy - clientY) * (cy - clientY);
-          if (d < bestDist) {
-            bestDist = d;
-            best = el;
-          }
-        });
-        if (!best) return null;
-        const r = best.getBoundingClientRect();
-        const after =
-          clientX > r.left + r.width / 2 ||
-          (Math.abs(clientX - (r.left + r.width / 2)) < 8 &&
-            clientY > r.top + r.height / 2);
-        if (after) {
-          const idx = cards.indexOf(best);
-          return idx < cards.length - 1 ? cards[idx + 1].dataset.kpi : null;
-        }
-        return best.dataset.kpi;
-      }
-
-      function placePlaceholder(clientX, clientY) {
-        const before = slotBeforeFromPoint(clientX, clientY);
-        const ph = ensurePlaceholder();
-        const cards = Array.prototype.slice.call(
-          strip.querySelectorAll(".kpi:not(.kpi-placeholder)")
-        );
-        if (!before) {
-          strip.appendChild(ph);
-          return;
-        }
-        const target = cards.find((c) => c.dataset.kpi === before);
-        if (target) strip.insertBefore(ph, target);
-        else strip.appendChild(ph);
+      function highlightSlot(ev) {
+        clearSlotHighlight();
+        const slot = slotElFromEvent(ev);
+        if (slot) slot.classList.add("drag-over");
       }
 
       strip.querySelectorAll(".kpi.kpi-draggable").forEach((el) => {
@@ -850,6 +881,7 @@
           dragId = el.dataset.kpi;
           didDrag = false;
           el.classList.add("dragging");
+          strip.classList.add("is-dragging");
           try {
             ev.dataTransfer.effectAllowed = "move";
             ev.dataTransfer.setData("text/plain", dragId);
@@ -863,33 +895,12 @@
         });
         el.addEventListener("dragend", () => {
           el.classList.remove("dragging", "drag-ghost");
-          clearPlaceholder();
+          strip.classList.remove("is-dragging");
+          clearSlotHighlight();
           dragId = null;
           setTimeout(() => {
             didDrag = false;
           }, 50);
-        });
-        el.addEventListener("dragover", (ev) => {
-          ev.preventDefault();
-          try {
-            ev.dataTransfer.dropEffect = "move";
-          } catch (_) {
-            /* ignore */
-          }
-        });
-        el.addEventListener("drop", (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          const before = slotBeforeFromPoint(ev.clientX, ev.clientY);
-          let id = dragId;
-          try {
-            if (!id && ev.dataTransfer) id = ev.dataTransfer.getData("text/plain");
-          } catch (_) {
-            /* ignore */
-          }
-          clearPlaceholder();
-          if (!id || id === before) return;
-          reorderKpiOrder(id, before);
         });
         el.onclick = (ev) => {
           if (didDrag || el.classList.contains("dragging")) {
@@ -911,26 +922,43 @@
         };
       });
 
-      strip.addEventListener("dragover", (ev) => {
-        ev.preventDefault();
-        if (!dragId) return;
-        placePlaceholder(ev.clientX, ev.clientY);
-      });
-      strip.addEventListener("drop", (ev) => {
-        ev.preventDefault();
-        const before = slotBeforeFromPoint(ev.clientX, ev.clientY);
-        let id = dragId;
-        try {
-          if (!id && ev.dataTransfer) id = ev.dataTransfer.getData("text/plain");
-        } catch (_) {
-          /* ignore */
-        }
-        clearPlaceholder();
-        if (!id) return;
-        reorderKpiOrder(id, before);
-      });
-      strip.addEventListener("dragleave", (ev) => {
-        if (!strip.contains(ev.relatedTarget)) clearPlaceholder();
+      strip.querySelectorAll(".kpi-slot").forEach((slot) => {
+        slot.addEventListener("dragover", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          try {
+            ev.dataTransfer.dropEffect = "move";
+          } catch (_) {
+            /* ignore */
+          }
+          if (!dragId) return;
+          highlightSlot(ev);
+        });
+        slot.addEventListener("dragenter", (ev) => {
+          ev.preventDefault();
+          if (!dragId) return;
+          highlightSlot(ev);
+        });
+        slot.addEventListener("dragleave", (ev) => {
+          const related = ev.relatedTarget;
+          if (related && slot.contains(related)) return;
+          slot.classList.remove("drag-over");
+        });
+        slot.addEventListener("drop", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          let id = dragId;
+          try {
+            if (!id && ev.dataTransfer) id = ev.dataTransfer.getData("text/plain");
+          } catch (_) {
+            /* ignore */
+          }
+          clearSlotHighlight();
+          strip.classList.remove("is-dragging");
+          const idx = parseInt(slot.getAttribute("data-slot"), 10);
+          if (!id || isNaN(idx)) return;
+          placeCardInSlot(id, idx);
+        });
       });
     }
 
