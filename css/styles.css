@@ -916,6 +916,11 @@ html, body {
   gap: 12px;
 }
 
+/* Match .kpis row gap: space between live-bar and Units cards */
+#boardFleet > .live-bar + .kpis {
+  margin-top: 12px;
+}
+
 .kpi-row-units {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
