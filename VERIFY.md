@@ -7,6 +7,8 @@ Inclusive overlapping future horizons; overdue separate. Counts use the same `ma
 | KPI / filter key | Expected | Matching units |
 |------------------|---------:|----------------|
 | Units | 8 | all |
+| needs-attention | 3 | 108, 122, 162 (insp or reg overdue) |
+| fleet-ok | 5 | not needs-attention |
 | insp-overdue | 2 | 108 (−7), 162 (−3) |
 | insp-week | 2 | 130 (2), 122 (7) |
 | insp-30 | 4 | 130 (2), 122 (7), 155 (17), 101 (20) |
@@ -21,9 +23,9 @@ Inclusive overlapping future horizons; overdue separate. Counts use the same `ma
 
 ## Layout
 
-- Row 1: Units card
-- Group **Inspection**: Overdue / 7 days / 30 days / 90 days
-- Group **Registration**: Overdue / 7 days / 30 days / 90 days
+- Row 1: Units | Needs attention | Fleet OK (fixed; not in slots)
+- Group **Inspection**: Overdue / 7 / 30 / 60 / 90 days (own slot row)
+- Group **Registration**: Overdue / 7 / 30 / 60 / 90 days (own slot row)
 - Labels legible (category + horizon); dark theme
 
 ## Fleet-only
@@ -34,7 +36,7 @@ Inclusive overlapping future horizons; overdue separate. Counts use the same `ma
 ## Checks
 
 - [ ] KPI card number equals filtered table/queue length for every key above
-- [ ] Queue title names Inspection vs Registration correctly when filtered
+- [ ] Queue title names Needs attention / Fleet OK / Inspection / Registration correctly when filtered
 - [ ] No "generic" controls in UI
 - [ ] Offline twins: ASCII max ord 126; no CDN/`fetch(`/`script src=`; OOXML `http://schemas...` literals OK
 
