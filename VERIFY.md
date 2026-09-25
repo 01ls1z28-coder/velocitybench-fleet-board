@@ -44,3 +44,6 @@ Table shows every non-blank workbook header; KPIs remain mapped insp/reg via `ma
 
 Click any fleet table `<th>` to sort visible/filtered rows. Same header toggles asc/desc; different header starts ascending. Indicators: ASCII `^` / `v`. Mapped insp/reg sort by days-until; year/numbers numeric; other dates via parseDate; else case-insensitive string. Sort key+dir persisted in `dashboard-fleet-view-v1:` localStorage. Default (no sortKey): inspection days ascending. See `/workspace/dashboard-kpi-fix/COLUMN-SORT.md`.
 
+## Customize layout (2026-09-25)
+
+**Customize** opens a local panel to show/hide KPI cards, table columns, and due queue. Persisted in `dashboard-fleet-view-v1:` with sort. Defaults = full layout. Local-only / no Pages push until approved. See `/workspace/dashboard-kpi-fix/CUSTOMIZE-LAYOUT.md`.

@@ -63,13 +63,41 @@
   }
 
   function create(api) {
+    const KPI_IDS = [
+      "fleet",
+      "insp-overdue",
+      "insp-week",
+      "insp-30",
+      "insp-90",
+      "reg-overdue",
+      "reg-week",
+      "reg-30",
+      "reg-90"
+    ];
+    const INSP_KPI_IDS = ["insp-overdue", "insp-week", "insp-30", "insp-90"];
+    const REG_KPI_IDS = ["reg-overdue", "reg-week", "reg-30", "reg-90"];
+
+    function defaultLayout() {
+      const kpis = {};
+      KPI_IDS.forEach((id) => {
+        kpis[id] = true;
+      });
+      return {
+        kpis: kpis,
+        groups: { inspection: true, registration: true },
+        columns: {},
+        showQueue: true
+      };
+    }
+
     const state = {
       map: {},
       filter: "",
       search: "",
       selected: -1,
       sortKey: null,
-      sortDir: "asc"
+      sortDir: "asc",
+      layout: defaultLayout()
     };
 
     function headers() {
@@ -161,10 +189,50 @@
             filter: state.filter,
             search: state.search,
             sortKey: state.sortKey,
-            sortDir: state.sortDir
+            sortDir: state.sortDir,
+            layout: {
+              kpis: Object.assign({}, state.layout.kpis),
+              groups: Object.assign({}, state.layout.groups),
+              columns: Object.assign({}, state.layout.columns),
+              showQueue: !!state.layout.showQueue
+            }
           })
         );
       } catch (_) { /* ignore */ }
+    }
+
+    function applySavedLayout(savedLayout) {
+      const base = defaultLayout();
+      if (!savedLayout || typeof savedLayout !== "object") {
+        state.layout = base;
+        return;
+      }
+      if (savedLayout.kpis && typeof savedLayout.kpis === "object") {
+        KPI_IDS.forEach((id) => {
+          if (typeof savedLayout.kpis[id] === "boolean") {
+            base.kpis[id] = savedLayout.kpis[id];
+          }
+        });
+      }
+      if (savedLayout.groups && typeof savedLayout.groups === "object") {
+        if (typeof savedLayout.groups.inspection === "boolean") {
+          base.groups.inspection = savedLayout.groups.inspection;
+        }
+        if (typeof savedLayout.groups.registration === "boolean") {
+          base.groups.registration = savedLayout.groups.registration;
+        }
+      }
+      if (savedLayout.columns && typeof savedLayout.columns === "object") {
+        Object.keys(savedLayout.columns).forEach((h) => {
+          if (typeof savedLayout.columns[h] === "boolean") {
+            base.columns[h] = savedLayout.columns[h];
+          }
+        });
+      }
+      if (typeof savedLayout.showQueue === "boolean") {
+        base.showQueue = savedLayout.showQueue;
+      }
+      state.layout = base;
     }
 
     function restoreView() {
@@ -189,8 +257,45 @@
         } else {
           state.sortDir = "asc";
         }
+        applySavedLayout(saved.layout);
         if ($("statusFilter")) $("statusFilter").value = state.filter;
       } catch (_) { /* ignore */ }
+    }
+
+    function isKpiVisible(id) {
+      if (!state.layout.kpis[id]) return false;
+      if (INSP_KPI_IDS.indexOf(id) >= 0 && !state.layout.groups.inspection) return false;
+      if (REG_KPI_IDS.indexOf(id) >= 0 && !state.layout.groups.registration) return false;
+      return true;
+    }
+
+    function isColumnVisible(headerName) {
+      if (Object.prototype.hasOwnProperty.call(state.layout.columns, headerName)) {
+        return !!state.layout.columns[headerName];
+      }
+      return true;
+    }
+
+    function visibleTableColumns() {
+      const cols = tableColumns().filter(isColumnVisible);
+      if (cols.length) return cols;
+      const all = tableColumns();
+      return all.length ? [all[0]] : [];
+    }
+
+    function ensureOneColumnVisible() {
+      const all = tableColumns();
+      if (!all.length) return;
+      if (visibleTableColumns().length) return;
+      state.layout.columns[all[0]] = true;
+    }
+
+    function resetLayoutDefaults() {
+      state.layout = defaultLayout();
+      persistView();
+      applyLayoutToDom();
+      buildBoard();
+      syncLayoutPanel();
     }
 
     function guessMap() {
@@ -422,38 +527,56 @@
       });
 
       const clickHint = "Click to filter";
-      const inspCards = [
-        kpi("insp-overdue", "Inspection", "Overdue", counts["insp-overdue"], counts["insp-overdue"] ? "var(--red)" : "var(--good)", clickHint),
-        kpi("insp-week", "Inspection", "7 days", counts["insp-week"], counts["insp-week"] ? "var(--warn)" : "var(--accent)", clickHint),
-        kpi("insp-30", "Inspection", "30 days", counts["insp-30"], counts["insp-30"] ? "var(--warn)" : "var(--accent)", clickHint),
-        kpi("insp-90", "Inspection", "90 days", counts["insp-90"], counts["insp-90"] ? "var(--warn)" : "var(--accent)", clickHint)
-      ].join("");
-      const regCards = [
-        kpi("reg-overdue", "Registration", "Overdue", counts["reg-overdue"], counts["reg-overdue"] ? "var(--red)" : "var(--good)", clickHint),
-        kpi("reg-week", "Registration", "7 days", counts["reg-week"], counts["reg-week"] ? "var(--warn)" : "var(--accent)", clickHint),
-        kpi("reg-30", "Registration", "30 days", counts["reg-30"], counts["reg-30"] ? "var(--warn)" : "var(--accent)", clickHint),
-        kpi("reg-90", "Registration", "90 days", counts["reg-90"], counts["reg-90"] ? "var(--warn)" : "var(--accent)", clickHint)
-      ].join("");
+      const inspDefs = [
+        ["insp-overdue", "Overdue", counts["insp-overdue"], counts["insp-overdue"] ? "var(--red)" : "var(--good)"],
+        ["insp-week", "7 days", counts["insp-week"], counts["insp-week"] ? "var(--warn)" : "var(--accent)"],
+        ["insp-30", "30 days", counts["insp-30"], counts["insp-30"] ? "var(--warn)" : "var(--accent)"],
+        ["insp-90", "90 days", counts["insp-90"], counts["insp-90"] ? "var(--warn)" : "var(--accent)"]
+      ];
+      const regDefs = [
+        ["reg-overdue", "Overdue", counts["reg-overdue"], counts["reg-overdue"] ? "var(--red)" : "var(--good)"],
+        ["reg-week", "7 days", counts["reg-week"], counts["reg-week"] ? "var(--warn)" : "var(--accent)"],
+        ["reg-30", "30 days", counts["reg-30"], counts["reg-30"] ? "var(--warn)" : "var(--accent)"],
+        ["reg-90", "90 days", counts["reg-90"], counts["reg-90"] ? "var(--warn)" : "var(--accent)"]
+      ];
+      const inspCards = inspDefs
+        .filter(([id]) => isKpiVisible(id))
+        .map(([id, horizon, value, color]) => kpi(id, "Inspection", horizon, value, color, clickHint))
+        .join("");
+      const regCards = regDefs
+        .filter(([id]) => isKpiVisible(id))
+        .map(([id, horizon, value, color]) => kpi(id, "Registration", horizon, value, color, clickHint))
+        .join("");
 
-      $("kpis").innerHTML =
-        `<div class="kpi-row kpi-row-units">` +
-        kpi(
-          "fleet",
-          "",
-          "Units",
-          rows().length,
-          "var(--soft)",
-          `${counts["reg-overdue"]} registration${counts["reg-overdue"] === 1 ? "" : "s"} overdue · click = all`
-        ) +
-        `</div>` +
-        `<div class="kpi-group" data-group="inspection">` +
-        `<div class="kpi-group-label">Inspection</div>` +
-        `<div class="kpi-group-grid">${inspCards}</div>` +
-        `</div>` +
-        `<div class="kpi-group" data-group="registration">` +
-        `<div class="kpi-group-label">Registration</div>` +
-        `<div class="kpi-group-grid">${regCards}</div>` +
-        `</div>`;
+      let html = "";
+      if (isKpiVisible("fleet")) {
+        html +=
+          `<div class="kpi-row kpi-row-units">` +
+          kpi(
+            "fleet",
+            "",
+            "Units",
+            rows().length,
+            "var(--soft)",
+            `${counts["reg-overdue"]} registration${counts["reg-overdue"] === 1 ? "" : "s"} overdue · click = all`
+          ) +
+          `</div>`;
+      }
+      if (state.layout.groups.inspection && inspCards) {
+        html +=
+          `<div class="kpi-group" data-group="inspection">` +
+          `<div class="kpi-group-label">Inspection</div>` +
+          `<div class="kpi-group-grid">${inspCards}</div>` +
+          `</div>`;
+      }
+      if (state.layout.groups.registration && regCards) {
+        html +=
+          `<div class="kpi-group" data-group="registration">` +
+          `<div class="kpi-group-label">Registration</div>` +
+          `<div class="kpi-group-grid">${regCards}</div>` +
+          `</div>`;
+      }
+      $("kpis").innerHTML = html;
       $("kpis").querySelectorAll(".kpi").forEach((el) => {
         el.onclick = () => {
           const id = el.dataset.kpi;
@@ -467,9 +590,19 @@
         };
       });
 
+      applyLayoutToDom();
       renderQueue();
       renderTable();
       persistView();
+    }
+
+    function applyLayoutToDom() {
+      const q = $("queueSection");
+      if (q) {
+        if (state.layout.showQueue) q.classList.remove("hidden");
+        else q.classList.add("hidden");
+      }
+      ensureOneColumnVisible();
     }
 
     function isPureNumber(v) {
@@ -562,8 +695,14 @@
     }
 
     function renderTable() {
-      const cols = tableColumns();
+      const cols = visibleTableColumns();
       const list = visibleRows();
+      if (!cols.length) {
+        $("thead").innerHTML = "";
+        $("tbody").innerHTML =
+          '<tr><td class="meta" style="padding:12px">No columns visible. Open Customize and enable at least one column.</td></tr>';
+        return;
+      }
       $("thead").innerHTML =
         "<tr>" +
         cols
@@ -676,7 +815,7 @@
     }
 
     function exportCurrentView() {
-      const cols = tableColumns();
+      const cols = visibleTableColumns();
       const list = visibleRows();
       const lines = [];
       lines.push(cols.map((h) => csvEscape(h)).join(","));
@@ -708,6 +847,121 @@
       }, 500);
     }
 
+
+    function syncLayoutPanel() {
+      const panel = $("layoutPanel");
+      if (!panel) return;
+      panel.querySelectorAll("[data-layout-kpi]").forEach((inp) => {
+        const id = inp.getAttribute("data-layout-kpi");
+        inp.checked = !!state.layout.kpis[id];
+      });
+      panel.querySelectorAll("[data-layout-group]").forEach((inp) => {
+        const g = inp.getAttribute("data-layout-group");
+        inp.checked = !!state.layout.groups[g];
+      });
+      const q = $("layoutShowQueue");
+      if (q) q.checked = !!state.layout.showQueue;
+      const host = $("layoutColChecks");
+      if (host) {
+        const cols = tableColumns();
+        host.innerHTML = cols.length
+          ? cols
+              .map((h) => {
+                const on = isColumnVisible(h);
+                return `<label class="layout-check"><input type="checkbox" data-layout-col="${escapeAttr(
+                  h
+                )}" ${on ? "checked" : ""} /> ${escapeHtml(h)}</label>`;
+              })
+              .join("")
+          : `<div class="layout-hint">Open a workbook to choose columns.</div>`;
+        host.querySelectorAll("[data-layout-col]").forEach((inp) => {
+          inp.onchange = () => {
+            const name = inp.getAttribute("data-layout-col");
+            if (!inp.checked) {
+              const wouldRemain = tableColumns().filter(
+                (h) => h !== name && isColumnVisible(h)
+              );
+              if (!wouldRemain.length) {
+                inp.checked = true;
+                return;
+              }
+            }
+            state.layout.columns[name] = !!inp.checked;
+            if (!inp.checked && state.sortKey === name) {
+              state.sortKey = null;
+              state.sortDir = "asc";
+            }
+            persistView();
+            renderTable();
+          };
+        });
+      }
+      /* disable individual KPIs when group master off */
+      INSP_KPI_IDS.forEach((id) => {
+        const el = panel.querySelector(`[data-layout-kpi="${id}"]`);
+        if (el) el.disabled = !state.layout.groups.inspection;
+      });
+      REG_KPI_IDS.forEach((id) => {
+        const el = panel.querySelector(`[data-layout-kpi="${id}"]`);
+        if (el) el.disabled = !state.layout.groups.registration;
+      });
+    }
+
+    function openLayoutPanel() {
+      const panel = $("layoutPanel");
+      const bd = $("layoutBackdrop");
+      if (!panel) return;
+      syncLayoutPanel();
+      panel.classList.remove("hidden");
+      panel.removeAttribute("hidden");
+      if (bd) {
+        bd.classList.remove("hidden");
+        bd.removeAttribute("hidden");
+      }
+      const done = $("layoutDoneBtn");
+      if (done) done.focus();
+    }
+
+    function closeLayoutPanel() {
+      const panel = $("layoutPanel");
+      const bd = $("layoutBackdrop");
+      if (panel) {
+        panel.classList.add("hidden");
+        panel.setAttribute("hidden", "");
+      }
+      if (bd) {
+        bd.classList.add("hidden");
+        bd.setAttribute("hidden", "");
+      }
+    }
+
+    function onLayoutPanelChange(ev) {
+      const t = ev.target;
+      if (!t) return;
+      if (t.hasAttribute("data-layout-kpi")) {
+        const id = t.getAttribute("data-layout-kpi");
+        state.layout.kpis[id] = !!t.checked;
+        persistView();
+        buildBoard();
+        syncLayoutPanel();
+        return;
+      }
+      if (t.hasAttribute("data-layout-group")) {
+        const g = t.getAttribute("data-layout-group");
+        state.layout.groups[g] = !!t.checked;
+        persistView();
+        buildBoard();
+        syncLayoutPanel();
+        return;
+      }
+      if (t.id === "layoutShowQueue") {
+        state.layout.showQueue = !!t.checked;
+        persistView();
+        applyLayoutToDom();
+        return;
+      }
+    }
+
     function wire() {
       $("applyMap").onclick = () => {
         buildBoard();
@@ -733,6 +987,32 @@
         guessMap();
         drawMapper();
       };
+      if ($("customizeBtn")) {
+        $("customizeBtn").onclick = () => openLayoutPanel();
+      }
+      if ($("layoutDoneBtn")) {
+        $("layoutDoneBtn").onclick = () => closeLayoutPanel();
+      }
+      if ($("layoutCloseBtn")) {
+        $("layoutCloseBtn").onclick = () => closeLayoutPanel();
+      }
+      if ($("layoutResetBtn")) {
+        $("layoutResetBtn").onclick = () => resetLayoutDefaults();
+      }
+      if ($("layoutBackdrop")) {
+        $("layoutBackdrop").onclick = () => closeLayoutPanel();
+      }
+      if ($("layoutPanel")) {
+        $("layoutPanel").addEventListener("change", onLayoutPanelChange);
+      }
+      document.addEventListener("keydown", (ev) => {
+        if (ev.key !== "Escape") return;
+        const panel = $("layoutPanel");
+        if (panel && !panel.classList.contains("hidden")) {
+          closeLayoutPanel();
+          ev.preventDefault();
+        }
+      });
     }
 
     function activate({ skipMapper }) {
@@ -768,7 +1048,10 @@
       guessMap,
       closeDrawer,
       exportCurrentView,
-      persistView
+      persistView,
+      openLayoutPanel,
+      closeLayoutPanel,
+      resetLayoutDefaults
     };
   }
 

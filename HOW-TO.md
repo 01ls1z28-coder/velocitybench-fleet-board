@@ -21,3 +21,8 @@ Each card count uses the **same rule** as its filter. Future horizons overlap (7
 ## Privacy
 
 Your workbook is read only in this browser. Nothing is uploaded.
+
+## Customize layout
+
+Click **Customize** (next to Refresh) to show or hide KPI cards, table columns, and the due queue. Choices save on this browser with your view. **Reset to defaults** restores the full layout.
+
