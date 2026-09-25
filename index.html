@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Free Dashboard tool — open Excel, CSV, or Google Sheets files on your computer. Nothing is collected; only you see your file." />
+  <meta name="description" content="Free Dashboard tool — open Excel, CSV, or Google Sheets files from your computer. Nothing collected or hosted; loads only from your file." />
   <title>Dashboard</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="vendor/xlsx.full.min.js"></script>
@@ -74,10 +74,9 @@
     <section id="loader">
       <div class="hero-drop" id="drop">
         <h2>Open a workbook</h2>
-        <p>Free tool — choose an Excel, CSV, or Google Sheets file saved on your computer. The dashboard is built from your header row right here in the browser.</p>
-        <button class="btn btn-primary cta" id="pickBtn" type="button">Choose file</button>
+        <p class="privacy-note">Free tool — open an Excel, CSV, or Google Sheets file from your computer. The dashboard builds from your header row right here in the browser. Nothing is collected or kept, and nothing is hosted on this site — everything loads only from the file you select on your machine.</p>
+        <button class="btn btn-primary cta" id="pickBtn" type="button">Open file</button>
         <input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
-        <p class="privacy-note">Nothing is collected here. Your file stays on your computer, and only you can see it.</p>
       </div>
     </section>
 
