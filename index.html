@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Dashboard — local Excel dashboard from your headers. Data stays in your browser." />
+  <meta name="description" content="Free Dashboard tool — open Excel, CSV, or Google Sheets files on your device. Nothing is uploaded or collected." />
   <title>Dashboard</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="vendor/xlsx.full.min.js"></script>
@@ -74,10 +74,10 @@
     <section id="loader">
       <div class="hero-drop" id="drop">
         <h2>Open a workbook</h2>
-        <p>Choose any Excel or CSV file on this computer. The dashboard is built from your header row — nothing is uploaded.</p>
+        <p>Free tool — choose an Excel, CSV, or Google Sheets file saved on this computer. The dashboard is built from your header row right here in the browser.</p>
         <button class="btn btn-primary cta" id="pickBtn" type="button">Choose file</button>
         <input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
-        <p class="privacy-note">Practice with <code>sample-fleet.xlsx</code> or <code>sample-orders.xlsx</code>. Chrome or Edge recommended for live Refresh.</p>
+        <p class="privacy-note">Nothing is uploaded or hosted. We do not collect, keep, or view your data — only you see the file you open. Practice with <code>sample-fleet.xlsx</code> or <code>sample-orders.xlsx</code>. Chrome or Edge recommended for live Refresh.</p>
       </div>
     </section>
 
@@ -193,7 +193,9 @@
 
     <footer class="app-footer">
       <div class="footer-disclaimer">
-        Dashboard reads your workbook only in this browser. Data stays on this computer and is never uploaded.
+        Free Dashboard tool for Excel, CSV, and Google Sheets files on your device.
+        This page reads the workbook only in your browser. Data stays on this computer — nothing is uploaded or hosted.
+        We do not collect, keep, or view any of your data. Everything comes from the file you choose, and only you can see it.
         Use for operational awareness — confirm dates against the source file before action.
       </div>
     </footer>

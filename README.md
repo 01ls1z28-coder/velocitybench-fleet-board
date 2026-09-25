@@ -1,14 +1,10 @@
-# VelocityBench Dashboard
+# Dashboard
 
 Local Excel → flexible dashboard. Open any workbook on this computer; the browser builds KPIs and a table from your **header row**. **Nothing is uploaded.**
-
-**Created by Jorge Guerra.**
 
 ## Live (after Pages deploy)
 
 https://01ls1z28-coder.github.io/velocitybench-fleet-board/
-
-Hub: [velocitybench.com](https://velocitybench.com/) · Bench: [velocitybench.com/bench/](https://velocitybench.com/bench/)
 
 ## Features
 
