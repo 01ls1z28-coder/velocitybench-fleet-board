@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Free Dashboard tool — open Excel, CSV, or Google Sheets files from your computer. Your file stays on your machine; only you open it." />
+  <meta name="description" content="Free Dashboard tool - open Excel, CSV, or Google Sheets files from your computer. Your file stays on your machine; only you open it." />
   <title>Dashboard</title>
   <link rel="stylesheet" href="css/styles.css" />
   <script src="vendor/xlsx.full.min.js"></script>
@@ -39,7 +39,7 @@
     <div id="fsaHint" class="banner warn hidden" role="status">
       <div class="banner-text">
         <strong>Live file handle unavailable.</strong>
-        This browser can’t keep a live file handle — choose the workbook again to refresh.
+        This browser can't keep a live file handle - choose the workbook again to refresh.
       </div>
       <div class="banner-actions">
         <button class="btn btn-primary" type="button" id="fsaRepickBtn">Choose workbook again</button>
@@ -61,7 +61,7 @@
     <section id="loader">
       <div class="hero-drop" id="drop">
         <h2>Open a workbook</h2>
-        <p class="privacy-note">Free tool to help you see your own data — open an Excel, CSV, or Google Sheets file from your computer. The dashboard builds from your header row right here in the browser. Your file stays right where it is; you only open it, and it never leaves your computer.</p>
+        <p class="privacy-note">Free tool to help you see your own data - open an Excel, CSV, or Google Sheets file from your computer. The dashboard builds from your header row right here in the browser. Your file stays right where it is; you only open it, and it never leaves your computer.</p>
         <button class="btn btn-primary cta" id="pickBtn" type="button">Open file</button>
         <input id="file" type="file" accept=".xlsx,.xls,.xlsm,.csv" hidden />
       </div>
@@ -85,7 +85,7 @@
     <section id="boardFleet" class="hidden">
       <div class="live-bar" id="liveBarFleet">
         <div class="live-meta">
-          <div class="file-name" id="fileNameFleet">—</div>
+          <div class="file-name" id="fileNameFleet">-</div>
           <div class="file-hint" id="fileHintFleet">Local workbook</div>
         </div>
         <div class="live-controls">
@@ -100,7 +100,7 @@
 
       <div class="mode-pill">
         <span class="pill accent">Fleet layout</span>
-        <span class="pill-hint">Inspection + registration horizons · status filters</span>
+        <span class="pill-hint">Inspection + registration horizons - drag cards to rearrange</span>
       </div>
 
       <div class="kpis" id="kpis"></div>
@@ -112,17 +112,19 @@
 
       <div class="panel">
         <div class="toolbar">
-          <input type="search" id="search" placeholder="Search unit, driver, plate, notes…" autocomplete="off" />
+          <input type="search" id="search" placeholder="Search unit, driver, plate, notes..." autocomplete="off" />
           <select id="statusFilter">
             <option value="">All units</option>
-            <option value="insp-overdue">Inspection · Overdue</option>
-            <option value="insp-week">Inspection · 7 days</option>
-            <option value="insp-30">Inspection · 30 days</option>
-            <option value="insp-90">Inspection · 90 days</option>
-            <option value="reg-overdue">Registration · Overdue</option>
-            <option value="reg-week">Registration · 7 days</option>
-            <option value="reg-30">Registration · 30 days</option>
-            <option value="reg-90">Registration · 90 days</option>
+            <option value="insp-overdue">Inspection - Overdue</option>
+            <option value="insp-week">Inspection - 7 days</option>
+            <option value="insp-30">Inspection - 30 days</option>
+            <option value="insp-60">Inspection - 60 days</option>
+            <option value="insp-90">Inspection - 90 days</option>
+            <option value="reg-overdue">Registration - Overdue</option>
+            <option value="reg-week">Registration - 7 days</option>
+            <option value="reg-30">Registration - 30 days</option>
+            <option value="reg-60">Registration - 60 days</option>
+            <option value="reg-90">Registration - 90 days</option>
             <option value="missing">Missing 90-day date</option>
           </select>
         </div>
@@ -138,7 +140,7 @@
     <footer class="app-footer">
       <div class="footer-disclaimer">
         Free tool for Excel, CSV, and Google Sheets files on your computer.
-        Your file stays right where it is — only you open it, and it never leaves your machine.
+        Your file stays right where it is - only you open it, and it never leaves your machine.
       </div>
     </footer>
   </div>
@@ -155,6 +157,7 @@
     <div class="layout-panel-body">
       <section class="layout-section">
         <h4>KPI cards</h4>
+        <p class="layout-hint">Drag cards on the board to reorder. They snap into the grid. Toggles below show or hide cards.</p>
         <label class="layout-check"><input type="checkbox" data-layout-kpi="fleet" /> Units</label>
         <div class="layout-group">
           <label class="layout-check layout-master"><input type="checkbox" data-layout-group="inspection" /> Inspection (all)</label>
@@ -162,6 +165,7 @@
             <label class="layout-check"><input type="checkbox" data-layout-kpi="insp-overdue" /> Overdue</label>
             <label class="layout-check"><input type="checkbox" data-layout-kpi="insp-week" /> 7 days</label>
             <label class="layout-check"><input type="checkbox" data-layout-kpi="insp-30" /> 30 days</label>
+            <label class="layout-check"><input type="checkbox" data-layout-kpi="insp-60" /> 60 days</label>
             <label class="layout-check"><input type="checkbox" data-layout-kpi="insp-90" /> 90 days</label>
           </div>
         </div>
@@ -171,6 +175,7 @@
             <label class="layout-check"><input type="checkbox" data-layout-kpi="reg-overdue" /> Overdue</label>
             <label class="layout-check"><input type="checkbox" data-layout-kpi="reg-week" /> 7 days</label>
             <label class="layout-check"><input type="checkbox" data-layout-kpi="reg-30" /> 30 days</label>
+            <label class="layout-check"><input type="checkbox" data-layout-kpi="reg-60" /> 60 days</label>
             <label class="layout-check"><input type="checkbox" data-layout-kpi="reg-90" /> 90 days</label>
           </div>
         </div>

@@ -1,4 +1,4 @@
-/* Fleet layout preset — v1 KPIs / queue / drawer / mapper + Phase 3 click-to-filter */
+/* Fleet layout preset - v1 KPIs / queue / drawer / mapper + Phase 3 click-to-filter */
 (function (global) {
   "use strict";
 
@@ -68,14 +68,29 @@
       "insp-overdue",
       "insp-week",
       "insp-30",
+      "insp-60",
       "insp-90",
       "reg-overdue",
       "reg-week",
       "reg-30",
+      "reg-60",
       "reg-90"
     ];
-    const INSP_KPI_IDS = ["insp-overdue", "insp-week", "insp-30", "insp-90"];
-    const REG_KPI_IDS = ["reg-overdue", "reg-week", "reg-30", "reg-90"];
+    const DEFAULT_KPI_ORDER = KPI_IDS.slice();
+    const INSP_KPI_IDS = [
+      "insp-overdue",
+      "insp-week",
+      "insp-30",
+      "insp-60",
+      "insp-90"
+    ];
+    const REG_KPI_IDS = [
+      "reg-overdue",
+      "reg-week",
+      "reg-30",
+      "reg-60",
+      "reg-90"
+    ];
 
     function defaultLayout() {
       const kpis = {};
@@ -86,8 +101,29 @@
         kpis: kpis,
         groups: { inspection: true, registration: true },
         columns: {},
-        showQueue: true
+        showQueue: true,
+        kpiOrder: DEFAULT_KPI_ORDER.slice()
       };
+    }
+
+    function normalizeKpiOrder(order) {
+      const seen = new Set();
+      const out = [];
+      if (Array.isArray(order)) {
+        order.forEach((id) => {
+          if (KPI_IDS.indexOf(id) >= 0 && !seen.has(id)) {
+            seen.add(id);
+            out.push(id);
+          }
+        });
+      }
+      DEFAULT_KPI_ORDER.forEach((id) => {
+        if (!seen.has(id)) {
+          seen.add(id);
+          out.push(id);
+        }
+      });
+      return out;
     }
 
     const state = {
@@ -194,7 +230,8 @@
               kpis: Object.assign({}, state.layout.kpis),
               groups: Object.assign({}, state.layout.groups),
               columns: Object.assign({}, state.layout.columns),
-              showQueue: !!state.layout.showQueue
+              showQueue: !!state.layout.showQueue,
+              kpiOrder: normalizeKpiOrder(state.layout.kpiOrder)
             }
           })
         );
@@ -232,6 +269,7 @@
       if (typeof savedLayout.showQueue === "boolean") {
         base.showQueue = savedLayout.showQueue;
       }
+      base.kpiOrder = normalizeKpiOrder(savedLayout.kpiOrder);
       state.layout = base;
     }
 
@@ -355,7 +393,7 @@
       const label = cat
         ? `<div class="lbl"><span class="lbl-cat">${cat}</span><span class="lbl-horizon">${horizon}</span></div>`
         : `<div class="lbl">${horizon}</div>`;
-      return `<div class="kpi clickable${active ? " active" : ""}" data-kpi="${id}" role="button" tabindex="0" aria-label="${cat ? cat + " " : ""}${horizon}">
+      return `<div class="kpi clickable kpi-draggable${active ? " active" : ""}" data-kpi="${id}" draggable="true" role="button" tabindex="0" aria-label="${cat ? cat + " " : ""}${horizon}">
       ${label}
       <div class="num" style="color:${color}">${value}</div>
       <div class="hint">${hint || ""}</div>
@@ -364,35 +402,27 @@
 
     function filterTitle(filter) {
       const map = {
-        "insp-overdue": "Inspection · Overdue",
-        "insp-week": "Inspection · 7 days",
-        "insp-30": "Inspection · 30 days",
-        "insp-90": "Inspection · 90 days",
-        "reg-overdue": "Registration · Overdue",
-        "reg-week": "Registration · 7 days",
-        "reg-30": "Registration · 30 days",
-        "reg-90": "Registration · 90 days",
+        "insp-overdue": "Inspection - Overdue",
+        "insp-week": "Inspection - 7 days",
+        "insp-30": "Inspection - 30 days",
+        "insp-60": "Inspection - 60 days",
+        "insp-90": "Inspection - 90 days",
+        "reg-overdue": "Registration - Overdue",
+        "reg-week": "Registration - 7 days",
+        "reg-30": "Registration - 30 days",
+        "reg-60": "Registration - 60 days",
+        "reg-90": "Registration - 90 days",
         missing: "Missing 90-day date"
       };
       return map[filter] || filter;
     }
 
     function isRegFilter(filter) {
-      return (
-        filter === "reg-overdue" ||
-        filter === "reg-week" ||
-        filter === "reg-30" ||
-        filter === "reg-90"
-      );
+      return REG_KPI_IDS.indexOf(filter) >= 0;
     }
 
     function isInspFilter(filter) {
-      return (
-        filter === "insp-overdue" ||
-        filter === "insp-week" ||
-        filter === "insp-30" ||
-        filter === "insp-90"
-      );
+      return INSP_KPI_IDS.indexOf(filter) >= 0;
     }
 
     function matchesFilter(r, filter) {
@@ -402,10 +432,12 @@
       if (filter === "insp-overdue") return !!(insp && insp.n < 0);
       if (filter === "insp-week") return !!(insp && insp.n >= 0 && insp.n <= 7);
       if (filter === "insp-30") return !!(insp && insp.n >= 0 && insp.n <= 30);
+      if (filter === "insp-60") return !!(insp && insp.n >= 0 && insp.n <= 60);
       if (filter === "insp-90") return !!(insp && insp.n >= 0 && insp.n <= 90);
       if (filter === "reg-overdue") return !!(reg && reg.n < 0);
       if (filter === "reg-week") return !!(reg && reg.n >= 0 && reg.n <= 7);
       if (filter === "reg-30") return !!(reg && reg.n >= 0 && reg.n <= 30);
+      if (filter === "reg-60") return !!(reg && reg.n >= 0 && reg.n <= 60);
       if (filter === "reg-90") return !!(reg && reg.n >= 0 && reg.n <= 90);
       if (filter === "missing") return !insp;
       return true;
@@ -456,11 +488,11 @@
         if (!state.filter) {
           title = "90-day inspection queue";
         } else if (useReg) {
-          title = "Registration queue · filtered: " + filterTitle(state.filter);
+          title = "Registration queue - filtered: " + filterTitle(state.filter);
         } else if (isInspFilter(state.filter)) {
-          title = "Inspection queue · filtered: " + filterTitle(state.filter);
+          title = "Inspection queue - filtered: " + filterTitle(state.filter);
         } else {
-          title = "Queue · filtered: " + filterTitle(state.filter);
+          title = "Queue - filtered: " + filterTitle(state.filter);
         }
         if (queue.length) title += " - Showing " + queue.length;
         h3.textContent = title;
@@ -475,7 +507,7 @@
             info.n < 0 ? "OVERDUE" : info.n + "d"
           }</div>
           <div>
-            <b>Unit ${escapeHtml(String(val(r, "id") || "—"))}</b>
+            <b>Unit ${escapeHtml(String(val(r, "id") || "-"))}</b>
             <div class="meta">${escapeHtml(String(val(r, "make") || ""))}</div>
           </div>
           <div class="meta">${escapeHtml(String(val(r, "driver") || "No driver"))}</div>
@@ -506,15 +538,17 @@
 
       /* KPI counts MUST match matchesFilter / statusFilter predicates so card
          numbers equal the filtered list length. Future horizons are inclusive
-         and overlapping (7-day subset of 30-day subset of 90-day); overdue separate. */
+         and overlapping (7 subset of 30 subset of 60 subset of 90); overdue separate. */
       const counts = {
         "insp-overdue": 0,
         "insp-week": 0,
         "insp-30": 0,
+        "insp-60": 0,
         "insp-90": 0,
         "reg-overdue": 0,
         "reg-week": 0,
         "reg-30": 0,
+        "reg-60": 0,
         "reg-90": 0,
         missing: 0
       };
@@ -526,75 +560,294 @@
         });
       });
 
-      const clickHint = "Click to filter";
-      const inspDefs = [
-        ["insp-overdue", "Overdue", counts["insp-overdue"], counts["insp-overdue"] ? "var(--red)" : "var(--good)"],
-        ["insp-week", "7 days", counts["insp-week"], counts["insp-week"] ? "var(--warn)" : "var(--accent)"],
-        ["insp-30", "30 days", counts["insp-30"], counts["insp-30"] ? "var(--warn)" : "var(--accent)"],
-        ["insp-90", "90 days", counts["insp-90"], counts["insp-90"] ? "var(--warn)" : "var(--accent)"]
-      ];
-      const regDefs = [
-        ["reg-overdue", "Overdue", counts["reg-overdue"], counts["reg-overdue"] ? "var(--red)" : "var(--good)"],
-        ["reg-week", "7 days", counts["reg-week"], counts["reg-week"] ? "var(--warn)" : "var(--accent)"],
-        ["reg-30", "30 days", counts["reg-30"], counts["reg-30"] ? "var(--warn)" : "var(--accent)"],
-        ["reg-90", "90 days", counts["reg-90"], counts["reg-90"] ? "var(--warn)" : "var(--accent)"]
-      ];
-      const inspCards = inspDefs
-        .filter(([id]) => isKpiVisible(id))
-        .map(([id, horizon, value, color]) => kpi(id, "Inspection", horizon, value, color, clickHint))
-        .join("");
-      const regCards = regDefs
-        .filter(([id]) => isKpiVisible(id))
-        .map(([id, horizon, value, color]) => kpi(id, "Registration", horizon, value, color, clickHint))
+      const clickHint = "Click to filter - drag to rearrange";
+      function toneColor(id, n) {
+        if (id.indexOf("overdue") >= 0) return n ? "var(--red)" : "var(--good)";
+        return n ? "var(--warn)" : "var(--brass)";
+      }
+      const defById = {
+        fleet: {
+          cat: "",
+          horizon: "Units",
+          value: rows().length,
+          color: "var(--brass-bright)",
+          hint:
+            counts["reg-overdue"] +
+            " registration" +
+            (counts["reg-overdue"] === 1 ? "" : "s") +
+            " overdue - click = all"
+        },
+        "insp-overdue": {
+          cat: "Inspection",
+          horizon: "Overdue",
+          value: counts["insp-overdue"],
+          color: toneColor("insp-overdue", counts["insp-overdue"]),
+          hint: clickHint
+        },
+        "insp-week": {
+          cat: "Inspection",
+          horizon: "7 days",
+          value: counts["insp-week"],
+          color: toneColor("insp-week", counts["insp-week"]),
+          hint: clickHint
+        },
+        "insp-30": {
+          cat: "Inspection",
+          horizon: "30 days",
+          value: counts["insp-30"],
+          color: toneColor("insp-30", counts["insp-30"]),
+          hint: clickHint
+        },
+        "insp-60": {
+          cat: "Inspection",
+          horizon: "60 days",
+          value: counts["insp-60"],
+          color: toneColor("insp-60", counts["insp-60"]),
+          hint: clickHint
+        },
+        "insp-90": {
+          cat: "Inspection",
+          horizon: "90 days",
+          value: counts["insp-90"],
+          color: toneColor("insp-90", counts["insp-90"]),
+          hint: clickHint
+        },
+        "reg-overdue": {
+          cat: "Registration",
+          horizon: "Overdue",
+          value: counts["reg-overdue"],
+          color: toneColor("reg-overdue", counts["reg-overdue"]),
+          hint: clickHint
+        },
+        "reg-week": {
+          cat: "Registration",
+          horizon: "7 days",
+          value: counts["reg-week"],
+          color: toneColor("reg-week", counts["reg-week"]),
+          hint: clickHint
+        },
+        "reg-30": {
+          cat: "Registration",
+          horizon: "30 days",
+          value: counts["reg-30"],
+          color: toneColor("reg-30", counts["reg-30"]),
+          hint: clickHint
+        },
+        "reg-60": {
+          cat: "Registration",
+          horizon: "60 days",
+          value: counts["reg-60"],
+          color: toneColor("reg-60", counts["reg-60"]),
+          hint: clickHint
+        },
+        "reg-90": {
+          cat: "Registration",
+          horizon: "90 days",
+          value: counts["reg-90"],
+          color: toneColor("reg-90", counts["reg-90"]),
+          hint: clickHint
+        }
+      };
+
+      state.layout.kpiOrder = normalizeKpiOrder(state.layout.kpiOrder);
+      const visibleOrder = state.layout.kpiOrder.filter((id) => isKpiVisible(id));
+      const cardsHtml = visibleOrder
+        .map((id) => {
+          const d = defById[id];
+          if (!d) return "";
+          return kpi(id, d.cat, d.horizon, d.value, d.color, d.hint);
+        })
         .join("");
 
-      let html = "";
-      if (isKpiVisible("fleet")) {
-        html +=
-          `<div class="kpi-row kpi-row-units">` +
-          kpi(
-            "fleet",
-            "",
-            "Units",
-            rows().length,
-            "var(--soft)",
-            `${counts["reg-overdue"]} registration${counts["reg-overdue"] === 1 ? "" : "s"} overdue · click = all`
-          ) +
-          `</div>`;
-      }
-      if (state.layout.groups.inspection && inspCards) {
-        html +=
-          `<div class="kpi-group" data-group="inspection">` +
-          `<div class="kpi-group-label">Inspection</div>` +
-          `<div class="kpi-group-grid">${inspCards}</div>` +
-          `</div>`;
-      }
-      if (state.layout.groups.registration && regCards) {
-        html +=
-          `<div class="kpi-group" data-group="registration">` +
-          `<div class="kpi-group-label">Registration</div>` +
-          `<div class="kpi-group-grid">${regCards}</div>` +
-          `</div>`;
-      }
-      $("kpis").innerHTML = html;
-      $("kpis").querySelectorAll(".kpi").forEach((el) => {
-        el.onclick = () => {
-          const id = el.dataset.kpi;
-          setFilter(id === "fleet" ? "" : id);
-        };
-        el.onkeydown = (ev) => {
-          if (ev.key === "Enter" || ev.key === " ") {
-            ev.preventDefault();
-            el.click();
-          }
-        };
-      });
+      $("kpis").innerHTML =
+        '<div class="kpi-strip" id="kpiStrip" aria-label="KPI cards - drag to rearrange">' +
+        cardsHtml +
+        "</div>";
+
+      wireKpiInteractions();
 
       applyLayoutToDom();
       renderQueue();
       renderTable();
       persistView();
     }
+
+    function reorderKpiOrder(dragId, beforeId) {
+      if (!dragId) return;
+      const order = normalizeKpiOrder(state.layout.kpiOrder).filter((id) => id !== dragId);
+      let insertAt = order.length;
+      if (beforeId) {
+        const idx = order.indexOf(beforeId);
+        if (idx >= 0) insertAt = idx;
+      }
+      order.splice(insertAt, 0, dragId);
+      state.layout.kpiOrder = normalizeKpiOrder(order);
+      persistView();
+      buildBoard();
+    }
+
+    function wireKpiInteractions() {
+      const strip = $("kpiStrip");
+      if (!strip) return;
+      let dragId = null;
+      let didDrag = false;
+      let placeholder = null;
+
+      function clearPlaceholder() {
+        if (placeholder && placeholder.parentNode) {
+          placeholder.parentNode.removeChild(placeholder);
+        }
+        placeholder = null;
+        strip.querySelectorAll(".kpi.drag-over").forEach((el) => {
+          el.classList.remove("drag-over");
+        });
+      }
+
+      function ensurePlaceholder() {
+        if (placeholder) return placeholder;
+        placeholder = document.createElement("div");
+        placeholder.className = "kpi kpi-placeholder";
+        placeholder.setAttribute("aria-hidden", "true");
+        placeholder.innerHTML = '<div class="lbl">Drop here</div>';
+        return placeholder;
+      }
+
+      function slotBeforeFromPoint(clientX, clientY) {
+        const cards = Array.prototype.slice.call(
+          strip.querySelectorAll(".kpi:not(.kpi-placeholder)")
+        );
+        if (!cards.length) return null;
+        let best = null;
+        let bestDist = Infinity;
+        cards.forEach((el) => {
+          if (el.dataset.kpi === dragId) return;
+          const r = el.getBoundingClientRect();
+          const cx = r.left + r.width / 2;
+          const cy = r.top + r.height / 2;
+          const d =
+            (cx - clientX) * (cx - clientX) + (cy - clientY) * (cy - clientY);
+          if (d < bestDist) {
+            bestDist = d;
+            best = el;
+          }
+        });
+        if (!best) return null;
+        const r = best.getBoundingClientRect();
+        const after =
+          clientX > r.left + r.width / 2 ||
+          (Math.abs(clientX - (r.left + r.width / 2)) < 8 &&
+            clientY > r.top + r.height / 2);
+        if (after) {
+          const idx = cards.indexOf(best);
+          return idx < cards.length - 1 ? cards[idx + 1].dataset.kpi : null;
+        }
+        return best.dataset.kpi;
+      }
+
+      function placePlaceholder(clientX, clientY) {
+        const before = slotBeforeFromPoint(clientX, clientY);
+        const ph = ensurePlaceholder();
+        const cards = Array.prototype.slice.call(
+          strip.querySelectorAll(".kpi:not(.kpi-placeholder)")
+        );
+        if (!before) {
+          strip.appendChild(ph);
+          return;
+        }
+        const target = cards.find((c) => c.dataset.kpi === before);
+        if (target) strip.insertBefore(ph, target);
+        else strip.appendChild(ph);
+      }
+
+      strip.querySelectorAll(".kpi").forEach((el) => {
+        el.addEventListener("dragstart", (ev) => {
+          dragId = el.dataset.kpi;
+          didDrag = false;
+          el.classList.add("dragging");
+          try {
+            ev.dataTransfer.effectAllowed = "move";
+            ev.dataTransfer.setData("text/plain", dragId);
+          } catch (_) {
+            /* Edge file:// */
+          }
+          setTimeout(() => {
+            didDrag = true;
+            el.classList.add("drag-ghost");
+          }, 0);
+        });
+        el.addEventListener("dragend", () => {
+          el.classList.remove("dragging", "drag-ghost");
+          clearPlaceholder();
+          dragId = null;
+          setTimeout(() => {
+            didDrag = false;
+          }, 50);
+        });
+        el.addEventListener("dragover", (ev) => {
+          ev.preventDefault();
+          try {
+            ev.dataTransfer.dropEffect = "move";
+          } catch (_) {
+            /* ignore */
+          }
+        });
+        el.addEventListener("drop", (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          const before = slotBeforeFromPoint(ev.clientX, ev.clientY);
+          let id = dragId;
+          try {
+            if (!id && ev.dataTransfer) id = ev.dataTransfer.getData("text/plain");
+          } catch (_) {
+            /* ignore */
+          }
+          clearPlaceholder();
+          if (!id || id === before) return;
+          reorderKpiOrder(id, before);
+        });
+        el.onclick = (ev) => {
+          if (didDrag || el.classList.contains("dragging")) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            return;
+          }
+          const id = el.dataset.kpi;
+          setFilter(id === "fleet" ? "" : id);
+        };
+        el.onkeydown = (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            if (!didDrag) {
+              const id = el.dataset.kpi;
+              setFilter(id === "fleet" ? "" : id);
+            }
+          }
+        };
+      });
+
+      strip.addEventListener("dragover", (ev) => {
+        ev.preventDefault();
+        if (!dragId) return;
+        placePlaceholder(ev.clientX, ev.clientY);
+      });
+      strip.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        const before = slotBeforeFromPoint(ev.clientX, ev.clientY);
+        let id = dragId;
+        try {
+          if (!id && ev.dataTransfer) id = ev.dataTransfer.getData("text/plain");
+        } catch (_) {
+          /* ignore */
+        }
+        clearPlaceholder();
+        if (!id) return;
+        reorderKpiOrder(id, before);
+      });
+      strip.addEventListener("dragleave", (ev) => {
+        if (!strip.contains(ev.relatedTarget)) clearPlaceholder();
+      });
+    }
+
 
     function applyLayoutToDom() {
       const q = $("queueSection");
@@ -754,7 +1007,7 @@
               }
               const raw = r[h] == null ? "" : r[h];
               const s = String(raw);
-              const display = s.trim() === "" ? "—" : s;
+              const display = s.trim() === "" ? "-" : s;
               if (fieldKey === "make")
                 return `<td class="wrap">${escapeHtml(display)}</td>`;
               if (fieldKey === "notes")
@@ -788,7 +1041,7 @@
         ["Vehicle ID#", val(r, "vid")],
         [
           "90 Day Insp.",
-          insp ? `${insp.date.toLocaleDateString()} · ${daysLabel(insp.n)}` : ""
+          insp ? `${insp.date.toLocaleDateString()} - ${daysLabel(insp.n)}` : ""
         ],
         ["Reg. Exp", (() => {
           const d = parseDate(val(r, "reg"));
@@ -798,7 +1051,7 @@
         ["Notes", val(r, "notes")]
       ].filter(([, v]) => v);
       $("drawer").innerHTML = `
-      <button class="icon-btn" id="closeDrawer" type="button" style="float:right" aria-label="Close">✕</button>
+      <button class="icon-btn" id="closeDrawer" type="button" style="float:right" aria-label="Close">X</button>
       <div class="chip ${badge[0]}">${badge[1]}</div>
       <h2>Unit ${escapeHtml(String(val(r, "id") || ""))}</h2>
       <div class="kv">${fields

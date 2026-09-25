@@ -1,4 +1,4 @@
-/* VelocityBench Dashboard — shell: FSA, IndexedDB, Fleet-only routing, Phase 3 persistence */
+/* VelocityBench Dashboard - shell: FSA, IndexedDB, Fleet-only routing, Phase 3 persistence */
 (function () {
   "use strict";
 
@@ -47,7 +47,7 @@
 
   const $ = (id) => document.getElementById(id);
 
-  /* ── IndexedDB handle persist ── */
+  /* ?? IndexedDB handle persist ?? */
   function idbOpen() {
     return new Promise((resolve, reject) => {
       const req = indexedDB.open(IDB_NAME, 1);
@@ -114,7 +114,7 @@
     }
   }
 
-  /* ── Fingerprint + last-workbook meta (local only) ── */
+  /* ?? Fingerprint + last-workbook meta (local only) ?? */
   function makeFingerprint(name, size, lastModified) {
     return [String(name || ""), String(size || 0), String(lastModified || 0)].join("|");
   }
@@ -152,7 +152,7 @@
     } catch (_) { /* ignore */ }
   }
 
-  /* ── UI helpers ── */
+  /* ?? UI helpers ?? */
   function toast(msg) {
     const el = $("toast");
     el.textContent = msg;
@@ -179,9 +179,9 @@
   function updateLiveMeta() {
     let hint = "Local workbook";
     if (state.supportsFsa && state.fileHandle) {
-      hint = "Live file handle · Chrome/Edge Refresh";
+      hint = "Live file handle  -  Chrome/Edge Refresh";
     } else if (state.fileName) {
-      hint = "Fallback mode · re-choose file to refresh";
+      hint = "Fallback mode  -  re-choose file to refresh";
     }
     $("fileNameFleet").textContent = state.fileName || "Workbook";
     $("fileHintFleet").textContent = hint;
@@ -256,10 +256,10 @@
 
 
   function showToastUpdated() {
-    toast("Updated — refreshed");
+    toast("Updated - refreshed");
   }
 
-  /* ── Shared API for modules ── */
+  /* ?? Shared API for modules ?? */
   const api = {
     getHeaders: () => state.headers,
     getRows: () => state.rows,
@@ -279,7 +279,7 @@
 
   const fleet = FleetBoardFleet.create(api);
 
-  /* ── File pick / load ── */
+  /* ?? File pick / load ?? */
   async function pickWithFsa() {
     const [handle] = await window.showOpenFilePicker({
       multiple: false,
@@ -439,7 +439,7 @@
       const okPerm = await ensurePermission(state.fileHandle, "read");
       if (!okPerm) {
         setFsaHint(true);
-        toast("Permission needed — choose the workbook again");
+        toast("Permission needed - choose the workbook again");
         return;
       }
       const ok = await loadFromHandle(state.fileHandle, {
@@ -450,7 +450,7 @@
       return;
     }
     setFsaHint(true);
-    toast("This browser can’t keep a live file handle — choose the workbook again");
+    toast("This browser can't keep a live file handle - choose the workbook again");
     pickWithInput();
   }
 
@@ -467,12 +467,12 @@
     await idbClearHandle();
     state.fileHandle = null;
     stopPoll();
-    /* keep last meta so gentle restore can still mention prior file if they cancel —
+    /* keep last meta so gentle restore can still mention prior file if they cancel -
        but clearing for intentional "open another" is fine; user is choosing anew */
     location.reload();
   }
 
-  /* ── Auto-check poll ── */
+  /* ?? Auto-check poll ?? */
   function stopPoll() {
     if (state.pollTimer) {
       clearInterval(state.pollTimer);
@@ -521,7 +521,7 @@
     else stopPoll();
   }
 
-  /* ── Wire UI ── */
+  /* ?? Wire UI ?? */
   $("pickBtn").onclick = () => pickFile();
   $("file").onchange = (e) => {
     if (e.target.files[0]) {
@@ -577,11 +577,11 @@
           await loadFromHandle(handle, { silent: true });
           return;
         }
-        /* handle remembered but permission not granted — prompt gently */
+        /* handle remembered but permission not granted - prompt gently */
         const name = (meta && meta.fileName) || handle.name || "your workbook";
         setRestoreHint(
           true,
-          `“${name}” was used last time on this device. Grant access or choose it again to restore your layout, columns, and filters.`
+          `"${name}" was used last time on this device. Grant access or choose it again to restore your layout, columns, and filters.`
         );
         return;
       }
@@ -590,7 +590,7 @@
     if (meta && meta.fileName) {
       setRestoreHint(
         true,
-        `Last workbook on this browser: “${meta.fileName}”. Choose it again to restore your saved layout, columns, sort, and filters.`
+        `Last workbook on this browser: "${meta.fileName}". Choose it again to restore your saved layout, columns, sort, and filters.`
       );
     }
   })();
