@@ -966,6 +966,25 @@ th.sortable:hover {
   color: var(--accent);
 }
 
+th.sortable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  color: var(--accent);
+}
+
+th.sortable.sorted {
+  color: var(--soft);
+}
+
+th.sortable .sort-ind {
+  display: inline-block;
+  margin-left: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: 0;
+}
+
 .num-cell {
   font-variant-numeric: tabular-nums;
   font-family: var(--mono);

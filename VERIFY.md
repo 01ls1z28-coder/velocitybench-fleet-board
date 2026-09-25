@@ -39,3 +39,8 @@ Inclusive overlapping future horizons; overdue separate. Counts use the same `ma
 ## All columns (2026-09-25)
 
 Table shows every non-blank workbook header; KPIs remain mapped insp/reg via `matchesFilter`. Queue uncapped (`Showing N`). Offline twins ASCII max ord 126; OOXML namespace literals OK. See `/workspace/dashboard-kpi-fix/ALL-COLUMNS.md`.
+
+## Column sort (2026-09-25)
+
+Click any fleet table `<th>` to sort visible/filtered rows. Same header toggles asc/desc; different header starts ascending. Indicators: ASCII `^` / `v`. Mapped insp/reg sort by days-until; year/numbers numeric; other dates via parseDate; else case-insensitive string. Sort key+dir persisted in `dashboard-fleet-view-v1:` localStorage. Default (no sortKey): inspection days ascending. See `/workspace/dashboard-kpi-fix/COLUMN-SORT.md`.
+

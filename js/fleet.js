@@ -67,7 +67,9 @@
       map: {},
       filter: "",
       search: "",
-      selected: -1
+      selected: -1,
+      sortKey: null,
+      sortDir: "asc"
     };
 
     function headers() {
@@ -157,7 +159,9 @@
             layoutMode: "fleet",
             sheet: api.getSheet ? api.getSheet() : "",
             filter: state.filter,
-            search: state.search
+            search: state.search,
+            sortKey: state.sortKey,
+            sortDir: state.sortDir
           })
         );
       } catch (_) { /* ignore */ }
@@ -174,6 +178,16 @@
         if (typeof saved.search === "string") {
           state.search = saved.search;
           if ($("search")) $("search").value = state.search;
+        }
+        if (typeof saved.sortKey === "string" && saved.sortKey) {
+          state.sortKey = saved.sortKey;
+        } else {
+          state.sortKey = null;
+        }
+        if (saved.sortDir === "desc" || saved.sortDir === "asc") {
+          state.sortDir = saved.sortDir;
+        } else {
+          state.sortDir = "asc";
         }
         if ($("statusFilter")) $("statusFilter").value = state.filter;
       } catch (_) { /* ignore */ }
@@ -458,30 +472,132 @@
       persistView();
     }
 
+    function isPureNumber(v) {
+      if (v == null || v === "") return false;
+      if (typeof v === "number" && isFinite(v)) return true;
+      const s = String(v).trim();
+      if (!s) return false;
+      return /^-?\d+(\.\d+)?$/.test(s);
+    }
+
+    function sortValueForColumn(r, headerName) {
+      const fieldKey = fieldKeyForHeader(headerName);
+      if (fieldKey === "insp") {
+        const info = inspInfo(r);
+        return info ? { kind: "num", n: info.n } : { kind: "empty" };
+      }
+      if (fieldKey === "reg") {
+        const info = regInfo(r);
+        return info ? { kind: "num", n: info.n } : { kind: "empty" };
+      }
+      const raw = r[headerName];
+      if (raw == null || String(raw).trim() === "") return { kind: "empty" };
+      if (fieldKey === "year" || isPureNumber(raw)) {
+        const n = typeof raw === "number" ? raw : parseFloat(String(raw).trim());
+        if (isFinite(n)) return { kind: "num", n: n };
+      }
+      const d = parseDate(raw);
+      if (d) return { kind: "num", n: daysUntil(d) };
+      return { kind: "str", s: String(raw) };
+    }
+
+    function compareSortValues(va, vb, dir) {
+      const mul = dir === "desc" ? -1 : 1;
+      if (va.kind === "empty" && vb.kind === "empty") return 0;
+      if (va.kind === "empty") return 1;
+      if (vb.kind === "empty") return -1;
+      if (va.kind === "num" && vb.kind === "num") {
+        if (va.n < vb.n) return -1 * mul;
+        if (va.n > vb.n) return 1 * mul;
+        return 0;
+      }
+      const sa = va.kind === "str" ? va.s : String(va.n);
+      const sb = vb.kind === "str" ? vb.s : String(vb.n);
+      return mul * sa.localeCompare(sb, undefined, { sensitivity: "base" });
+    }
+
+    function defaultInspSort(a, b) {
+      const an = inspInfo(a.r),
+        bn = inspInfo(b.r);
+      if (!an && !bn) return 0;
+      if (!an) return 1;
+      if (!bn) return -1;
+      return an.n - bn.n;
+    }
+
     function visibleRows() {
       const q = norm(state.search);
-      return rows()
+      const list = rows()
         .map((r, idx) => ({ r, idx }))
         .filter(({ r }) => {
           if (!matchesFilter(r, state.filter)) return false;
           if (!q) return true;
           return tableColumns().some((h) => norm(r[h]).includes(q));
-        })
-        .sort((a, b) => {
-          const an = inspInfo(a.r),
-            bn = inspInfo(b.r);
-          if (!an && !bn) return 0;
-          if (!an) return 1;
-          if (!bn) return -1;
-          return an.n - bn.n;
         });
+      if (!state.sortKey) {
+        return list.sort(defaultInspSort);
+      }
+      const key = state.sortKey;
+      const dir = state.sortDir === "desc" ? "desc" : "asc";
+      return list.sort((a, b) => {
+        const cmp = compareSortValues(
+          sortValueForColumn(a.r, key),
+          sortValueForColumn(b.r, key),
+          dir
+        );
+        if (cmp !== 0) return cmp;
+        return defaultInspSort(a, b);
+      });
+    }
+
+    function setSort(headerName) {
+      if (state.sortKey === headerName) {
+        state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+      } else {
+        state.sortKey = headerName;
+        state.sortDir = "asc";
+      }
+      persistView();
+      renderTable();
     }
 
     function renderTable() {
       const cols = tableColumns();
       const list = visibleRows();
       $("thead").innerHTML =
-        "<tr>" + cols.map((h) => `<th title="${escapeAttr(h)}">${escapeHtml(h)}</th>`).join("") + "</tr>";
+        "<tr>" +
+        cols
+          .map((h) => {
+            const active = state.sortKey === h;
+            const ind = active
+              ? state.sortDir === "desc"
+                ? ' <span class="sort-ind" aria-hidden="true">v</span>'
+                : ' <span class="sort-ind" aria-hidden="true">^</span>'
+              : "";
+            const ariaSort = active
+              ? state.sortDir === "desc"
+                ? "descending"
+                : "ascending"
+              : "none";
+            const cls = "sortable" + (active ? " sorted sorted-" + state.sortDir : "");
+            return `<th class="${cls}" data-col="${escapeAttr(h)}" title="${escapeAttr(
+              h
+            )}" role="button" tabindex="0" aria-sort="${ariaSort}">${escapeHtml(h)}${ind}</th>`;
+          })
+          .join("") +
+        "</tr>";
+      $("thead").querySelectorAll("th.sortable").forEach((th) => {
+        th.onclick = (ev) => {
+          ev.stopPropagation();
+          setSort(th.dataset.col);
+        };
+        th.onkeydown = (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            setSort(th.dataset.col);
+          }
+        };
+      });
       $("tbody").innerHTML = list
         .map(({ r, idx }) => {
           const cells = cols
