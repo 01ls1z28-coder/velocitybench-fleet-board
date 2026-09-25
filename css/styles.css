@@ -923,9 +923,10 @@ html, body {
 
 .kpi-row-units {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
+  align-items: stretch;
 }
 
 .kpi-divider {
@@ -1077,6 +1078,7 @@ html, body {
 .kpi.dragging,
 .kpi.drag-ghost {
   opacity: 0.35;
+  pointer-events: none;
 }
 
 .kpi.drag-over {

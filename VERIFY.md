@@ -24,7 +24,7 @@ Inclusive overlapping future horizons; overdue separate. Counts use the same `ma
 
 ## Layout
 
-- Row 1: Units | Needs attention | Fleet OK | No dates (fixed; not in slots; disjoint buckets)
+- Row 1: Units | Needs attention | Fleet OK | No dates (slot-drop within row; disjoint buckets)
 - Group **Inspection**: Overdue / 7 / 30 / 60 / 90 days (own slot row)
 - Group **Registration**: Overdue / 7 / 30 / 60 / 90 days (own slot row)
 - Labels legible (category + horizon); dark theme

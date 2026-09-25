@@ -64,6 +64,7 @@
 
   function create(api) {
     const UNITS_EXTRA_KPI_IDS = ["needs-attention", "fleet-ok", "no-dates"];
+    const UNITS_KPI_IDS = ["fleet", "needs-attention", "fleet-ok", "no-dates"];
     const KPI_IDS = [
       "fleet",
       "needs-attention",
@@ -80,7 +81,7 @@
       "reg-60",
       "reg-90"
     ];
-    /* Units + Needs attention + Fleet OK + No dates are fixed on top; inspSlots + regSlots are separate rows. */
+    /* Three slot rows: unitsSlots (top), inspSlots, regSlots. Drag/swap only within a row. */
     const REORDERABLE_KPI_IDS = KPI_IDS.filter(
       (id) => id !== "fleet" && UNITS_EXTRA_KPI_IDS.indexOf(id) < 0
     );
@@ -123,12 +124,13 @@
         kpis[id] = true;
       });
       kpis.fleet = true; /* Units always shown */
-      /* needs-attention + fleet-ok + no-dates default visible (fixed units row, not slots) */
+      /* needs-attention + fleet-ok + no-dates default visible (unitsSlots row) */
       return {
         kpis: kpis,
         groups: { inspection: true, registration: true },
         columns: {},
         showQueue: true,
+        unitsSlots: defaultUnitsSlots(),
         inspSlots: defaultInspSlots(),
         regSlots: defaultRegSlots(),
         theme: DEFAULT_THEME,
@@ -181,6 +183,11 @@
       return out;
     }
 
+    function defaultUnitsSlots() {
+      /* Units, Needs attention, Fleet OK, No dates */
+      return UNITS_KPI_IDS.slice();
+    }
+
     function defaultInspSlots() {
       /* Overdue, 7 days, 30 days, 60 days, 90 days */
       return INSP_KPI_IDS.slice();
@@ -199,7 +206,7 @@
       const seen = new Set();
 
       function tryPlace(id, prefer) {
-        if (!id || id === "fleet" || UNITS_EXTRA_KPI_IDS.indexOf(id) >= 0) return;
+        if (!id || id === "" || id === "empty") return;
         if (allowedIds.indexOf(id) < 0) return;
         if (seen.has(id)) return;
         let idx = typeof prefer === "number" ? prefer : -1;
@@ -271,18 +278,32 @@
 
     function syncSlotsWithVisibility() {
       /* Hidden cards free their slot within that row only. */
+      const units = syncRowSlotsWithVisibility(state.layout.unitsSlots, UNITS_KPI_IDS);
       const insp = syncRowSlotsWithVisibility(state.layout.inspSlots, INSP_KPI_IDS);
       const reg = syncRowSlotsWithVisibility(state.layout.regSlots, REG_KPI_IDS);
+      state.layout.unitsSlots = units;
       state.layout.inspSlots = insp;
       state.layout.regSlots = reg;
-      return { inspSlots: insp, regSlots: reg };
+      return { unitsSlots: units, inspSlots: insp, regSlots: reg };
+    }
+
+    function allowedIdsForRow(rowKey) {
+      if (rowKey === "units") return UNITS_KPI_IDS;
+      if (rowKey === "reg") return REG_KPI_IDS;
+      return INSP_KPI_IDS;
+    }
+
+    function layoutKeyForRow(rowKey) {
+      if (rowKey === "units") return "unitsSlots";
+      if (rowKey === "reg") return "regSlots";
+      return "inspSlots";
     }
 
     function placeCardInSlot(dragId, rowKey, targetSlotIndex) {
-      if (!dragId || dragId === "fleet" || UNITS_EXTRA_KPI_IDS.indexOf(dragId) >= 0) return false;
-      const allowed = rowKey === "reg" ? REG_KPI_IDS : INSP_KPI_IDS;
+      if (!dragId) return false;
+      const allowed = allowedIdsForRow(rowKey);
       if (allowed.indexOf(dragId) < 0) return false;
-      const layoutKey = rowKey === "reg" ? "regSlots" : "inspSlots";
+      const layoutKey = layoutKeyForRow(rowKey);
       const slots = normalizeRowSlots(state.layout[layoutKey], allowed);
       const from = slots.indexOf(dragId);
       if (from < 0) return false;
@@ -403,9 +424,11 @@
               groups: Object.assign({}, state.layout.groups),
               columns: Object.assign({}, state.layout.columns),
               showQueue: !!state.layout.showQueue,
+              unitsSlots: normalizeRowSlots(state.layout.unitsSlots, UNITS_KPI_IDS),
               inspSlots: normalizeRowSlots(state.layout.inspSlots, INSP_KPI_IDS),
               regSlots: normalizeRowSlots(state.layout.regSlots, REG_KPI_IDS),
-              theme: normalizeTheme(state.layout.theme)
+              theme: normalizeTheme(state.layout.theme),
+              slotsVersion: SLOTS_VERSION
             }
           })
         );
@@ -464,10 +487,16 @@
         base.inspSlots = defaultInspSlots();
         base.regSlots = defaultRegSlots();
       }
+      if (Array.isArray(savedLayout.unitsSlots)) {
+        base.unitsSlots = normalizeRowSlots(savedLayout.unitsSlots, UNITS_KPI_IDS);
+      } else {
+        base.unitsSlots = defaultUnitsSlots();
+      }
       /* One-time: older saves may have experimental slot orders - restore canonical default. */
       if (savedLayout.slotsVersion !== SLOTS_VERSION) {
         base.inspSlots = defaultInspSlots();
         base.regSlots = defaultRegSlots();
+        /* Keep unitsSlots when present; only reset if missing above. */
       }
       base.slotsVersion = SLOTS_VERSION;
       base.theme = normalizeTheme(savedLayout.theme);
@@ -884,28 +913,28 @@
             (counts["needs-attention"] === 1
               ? " needs attention"
               : " need attention") +
-            " - click = all"
+            " - drop to rearrange"
         },
         "needs-attention": {
           cat: "",
           horizon: "Needs attention",
           value: counts["needs-attention"],
           color: counts["needs-attention"] ? "var(--red)" : "var(--good)",
-          hint: "Insp or reg overdue - click to filter"
+          hint: "Insp or reg overdue - drop to rearrange"
         },
         "fleet-ok": {
           cat: "",
           horizon: "Fleet OK",
           value: counts["fleet-ok"],
           color: "var(--good)",
-          hint: "Has insp/reg date, none overdue - click to filter"
+          hint: "Has insp/reg date, none overdue - drop to rearrange"
         },
         "no-dates": {
           cat: "",
           horizon: "No dates",
           value: counts["no-dates"],
           color: counts["no-dates"] ? "var(--text-muted)" : "var(--good)",
-          hint: "No inspection or registration date - other equipment"
+          hint: "No insp/reg date - drop to rearrange"
         },
         "insp-overdue": {
           cat: "Inspection",
@@ -982,17 +1011,6 @@
       applyTheme(state.layout.theme);
       const slotRows = syncSlotsWithVisibility();
 
-      function fixedKpiHtml(id) {
-        const d = defById[id];
-        if (!d || !isKpiVisible(id)) return "";
-        return kpi(id, d.cat, d.horizon, d.value, d.color, d.hint, { fixed: true });
-      }
-      const unitsHtml =
-        fixedKpiHtml("fleet") +
-        fixedKpiHtml("needs-attention") +
-        fixedKpiHtml("fleet-ok") +
-        fixedKpiHtml("no-dates");
-
       function slotsHtmlFor(slots, rowKey) {
         return slots
           .map((id, slotIndex) => {
@@ -1019,8 +1037,8 @@
       }
 
       $("kpis").innerHTML =
-        '<div class="kpi-row-units" id="kpiUnitsRow" aria-label="Units summary">' +
-        unitsHtml +
+        '<div class="kpi-row-units kpi-strip" id="kpiUnitsRow" data-slot-row="units" aria-label="Units summary slots">' +
+        slotsHtmlFor(slotRows.unitsSlots, "units") +
         "</div>" +
         '<hr class="kpi-divider" aria-hidden="true" />' +
         '<div class="kpi-group kpi-row-section" id="kpiInspSection">' +
@@ -1037,9 +1055,9 @@
         "</div>" +
         "</div>";
 
+      wireKpiInteractions($("kpiUnitsRow"), "units");
       wireKpiInteractions($("kpiStripInsp"), "insp");
       wireKpiInteractions($("kpiStripReg"), "reg");
-      wireUnitsClick();
 
       applyLayoutToDom();
       renderQueue();
@@ -1047,28 +1065,9 @@
       persistView();
     }
 
-    function wireUnitsClick() {
-      const row = $("kpiUnitsRow");
-      if (!row) return;
-      row.querySelectorAll(".kpi").forEach((el) => {
-        const apply = () => {
-          const id = el.dataset.kpi;
-          if (id === "fleet") setFilter("");
-          else setFilter(id || "");
-        };
-        el.onclick = apply;
-        el.onkeydown = (ev) => {
-          if (ev.key === "Enter" || ev.key === " ") {
-            ev.preventDefault();
-            apply();
-          }
-        };
-      });
-    }
-
     function wireKpiInteractions(strip, rowKey) {
       if (!strip || !rowKey) return;
-      const allowed = rowKey === "reg" ? REG_KPI_IDS : INSP_KPI_IDS;
+      const allowed = allowedIdsForRow(rowKey);
       let dragId = null;
       let didDrag = false;
 
@@ -1078,11 +1077,50 @@
         });
       }
 
+      /* Resolve slot under the pointer. Full-width cards left hit-testing on
+         ev.target / closed-over listeners unreliable (ghost covers neighbors). */
+      function slotElFromPoint(clientX, clientY) {
+        let list = [];
+        try {
+          if (document.elementsFromPoint) {
+            list = document.elementsFromPoint(clientX, clientY) || [];
+          } else {
+            const one = document.elementFromPoint(clientX, clientY);
+            if (one) list = [one];
+          }
+        } catch (_) {
+          list = [];
+        }
+        for (let i = 0; i < list.length; i++) {
+          const el = list[i];
+          if (!el || !el.closest) continue;
+          const slot = el.closest(".kpi-slot");
+          if (
+            slot &&
+            strip.contains(slot) &&
+            slot.getAttribute("data-slot-row") === rowKey
+          ) {
+            return slot;
+          }
+        }
+        return null;
+      }
+
       function slotElFromEvent(ev) {
-        const t = ev.target;
+        if (ev && typeof ev.clientX === "number" && typeof ev.clientY === "number") {
+          const hit = slotElFromPoint(ev.clientX, ev.clientY);
+          if (hit) return hit;
+        }
+        const t = ev && ev.target;
         if (!t || !t.closest) return null;
         const slot = t.closest(".kpi-slot");
-        if (!slot || slot.getAttribute("data-slot-row") !== rowKey) return null;
+        if (
+          !slot ||
+          !strip.contains(slot) ||
+          slot.getAttribute("data-slot-row") !== rowKey
+        ) {
+          return null;
+        }
         return slot;
       }
 
@@ -1094,6 +1132,31 @@
 
       function acceptsDrag(id) {
         return !!(id && allowed.indexOf(id) >= 0);
+      }
+
+      function readDragId(ev) {
+        let id = dragId;
+        try {
+          if (!id && ev && ev.dataTransfer) {
+            id = ev.dataTransfer.getData("text/plain");
+          }
+        } catch (_) {
+          /* ignore */
+        }
+        return id;
+      }
+
+      function applyDrop(ev) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        const id = readDragId(ev);
+        clearSlotHighlight();
+        strip.classList.remove("is-dragging");
+        const target = slotElFromEvent(ev);
+        if (!target) return;
+        const idx = parseInt(target.getAttribute("data-slot"), 10);
+        if (!acceptsDrag(id) || isNaN(idx)) return;
+        placeCardInSlot(id, rowKey, idx);
       }
 
       strip.querySelectorAll(".kpi.kpi-draggable").forEach((el) => {
@@ -1112,6 +1175,15 @@
           try {
             ev.dataTransfer.effectAllowed = "move";
             ev.dataTransfer.setData("text/plain", dragId);
+            /* Center drag image on cursor so ghost aligns with drop aim. */
+            if (typeof ev.dataTransfer.setDragImage === "function") {
+              const r = el.getBoundingClientRect();
+              ev.dataTransfer.setDragImage(
+                el,
+                Math.max(0, Math.round(ev.clientX - r.left)),
+                Math.max(0, Math.round(ev.clientY - r.top))
+              );
+            }
           } catch (_) {
             /* Edge file:// */
           }
@@ -1149,9 +1221,9 @@
         };
       });
 
-      strip.querySelectorAll(".kpi-slot").forEach((slot) => {
+      function armSlot(slot) {
         slot.addEventListener("dragover", (ev) => {
-          if (!acceptsDrag(dragId)) return;
+          if (!acceptsDrag(dragId) && !acceptsDrag(readDragId(ev))) return;
           ev.preventDefault();
           ev.stopPropagation();
           try {
@@ -1162,33 +1234,40 @@
           highlightSlot(ev);
         });
         slot.addEventListener("dragenter", (ev) => {
-          if (!acceptsDrag(dragId)) return;
+          if (!acceptsDrag(dragId) && !acceptsDrag(readDragId(ev))) return;
           ev.preventDefault();
           highlightSlot(ev);
         });
         slot.addEventListener("dragleave", (ev) => {
           const related = ev.relatedTarget;
           if (related && slot.contains(related)) return;
+          /* Only clear if pointer left this slot for a non-slot / other slot. */
+          const still = slotElFromEvent(ev);
+          if (still === slot) return;
           slot.classList.remove("drag-over");
         });
-        slot.addEventListener("drop", (ev) => {
-          ev.preventDefault();
-          ev.stopPropagation();
-          let id = dragId;
-          try {
-            if (!id && ev.dataTransfer) id = ev.dataTransfer.getData("text/plain");
-          } catch (_) {
-            /* ignore */
-          }
-          clearSlotHighlight();
-          strip.classList.remove("is-dragging");
-          const idx = parseInt(slot.getAttribute("data-slot"), 10);
-          if (!acceptsDrag(id) || isNaN(idx)) return;
-          placeCardInSlot(id, rowKey, idx);
-        });
+        slot.addEventListener("drop", applyDrop);
+      }
+
+      strip.querySelectorAll(".kpi-slot").forEach(armSlot);
+
+      /* Strip-level fallback: drop between gaps / when child misses. */
+      strip.addEventListener("dragover", (ev) => {
+        if (!acceptsDrag(dragId) && !acceptsDrag(readDragId(ev))) return;
+        if (!slotElFromEvent(ev)) return;
+        ev.preventDefault();
+        try {
+          ev.dataTransfer.dropEffect = "move";
+        } catch (_) {
+          /* ignore */
+        }
+        highlightSlot(ev);
+      });
+      strip.addEventListener("drop", (ev) => {
+        if (!slotElFromEvent(ev)) return;
+        applyDrop(ev);
       });
     }
-
 
     function applyLayoutToDom() {
       const q = $("queueSection");
