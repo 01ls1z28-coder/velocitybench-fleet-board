@@ -839,7 +839,7 @@
       };
 
       applyTheme(state.layout.theme);
-      const rows = syncSlotsWithVisibility();
+      const slotRows = syncSlotsWithVisibility();
 
       const unitsDef = defById.fleet;
       const unitsHtml = kpi(
@@ -885,14 +885,14 @@
         '<div class="kpi-group kpi-row-section" id="kpiInspSection">' +
         '<div class="kpi-group-label">Inspection</div>' +
         '<div class="kpi-strip kpi-strip-insp" id="kpiStripInsp" data-slot-row="insp" aria-label="Inspection KPI slots">' +
-        slotsHtmlFor(rows.inspSlots, "insp") +
+        slotsHtmlFor(slotRows.inspSlots, "insp") +
         "</div>" +
         "</div>" +
         '<hr class="kpi-divider" aria-hidden="true" />' +
         '<div class="kpi-group kpi-row-section" id="kpiRegSection">' +
         '<div class="kpi-group-label">Registration</div>' +
         '<div class="kpi-strip kpi-strip-reg" id="kpiStripReg" data-slot-row="reg" aria-label="Registration KPI slots">' +
-        slotsHtmlFor(rows.regSlots, "reg") +
+        slotsHtmlFor(slotRows.regSlots, "reg") +
         "</div>" +
         "</div>";
 
