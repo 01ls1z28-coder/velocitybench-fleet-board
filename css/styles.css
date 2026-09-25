@@ -918,8 +918,9 @@ html, body {
 
 .kpi-row-units {
   display: grid;
-  grid-template-columns: minmax(180px, 280px);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 280px));
   gap: 12px;
+  max-width: 960px;
 }
 
 .kpi-divider {

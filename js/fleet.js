@@ -63,8 +63,11 @@
   }
 
   function create(api) {
+    const UNITS_EXTRA_KPI_IDS = ["needs-attention", "fleet-ok"];
     const KPI_IDS = [
       "fleet",
+      "needs-attention",
+      "fleet-ok",
       "insp-overdue",
       "insp-week",
       "insp-30",
@@ -76,8 +79,10 @@
       "reg-60",
       "reg-90"
     ];
-    /* Units (fleet) is fixed on top; inspSlots + regSlots are separate rows. */
-    const REORDERABLE_KPI_IDS = KPI_IDS.filter((id) => id !== "fleet");
+    /* Units + Needs attention + Fleet OK are fixed on top; inspSlots + regSlots are separate rows. */
+    const REORDERABLE_KPI_IDS = KPI_IDS.filter(
+      (id) => id !== "fleet" && UNITS_EXTRA_KPI_IDS.indexOf(id) < 0
+    );
     const DEFAULT_KPI_ORDER = REORDERABLE_KPI_IDS.slice();
     const THEME_IDS = [
       "dark",
@@ -117,6 +122,7 @@
         kpis[id] = true;
       });
       kpis.fleet = true; /* Units always shown */
+      /* needs-attention + fleet-ok default visible (fixed units row, not slots) */
       return {
         kpis: kpis,
         groups: { inspection: true, registration: true },
@@ -158,7 +164,7 @@
       const out = [];
       if (Array.isArray(order)) {
         order.forEach((id) => {
-          if (id === "fleet") return;
+          if (id === "fleet" || UNITS_EXTRA_KPI_IDS.indexOf(id) >= 0) return;
           if (REORDERABLE_KPI_IDS.indexOf(id) >= 0 && !seen.has(id)) {
             seen.add(id);
             out.push(id);
@@ -192,7 +198,7 @@
       const seen = new Set();
 
       function tryPlace(id, prefer) {
-        if (!id || id === "fleet") return;
+        if (!id || id === "fleet" || UNITS_EXTRA_KPI_IDS.indexOf(id) >= 0) return;
         if (allowedIds.indexOf(id) < 0) return;
         if (seen.has(id)) return;
         let idx = typeof prefer === "number" ? prefer : -1;
@@ -225,7 +231,7 @@
       const seenReg = new Set();
       if (Array.isArray(unified)) {
         unified.forEach((id) => {
-          if (!id || id === "fleet" || id === "" || id === "empty") return;
+          if (!id || id === "fleet" || UNITS_EXTRA_KPI_IDS.indexOf(id) >= 0 || id === "" || id === "empty") return;
           if (INSP_KPI_IDS.indexOf(id) >= 0 && !seenInsp.has(id)) {
             seenInsp.add(id);
             inspOrder.push(id);
@@ -272,7 +278,7 @@
     }
 
     function placeCardInSlot(dragId, rowKey, targetSlotIndex) {
-      if (!dragId || dragId === "fleet") return false;
+      if (!dragId || dragId === "fleet" || UNITS_EXTRA_KPI_IDS.indexOf(dragId) >= 0) return false;
       const allowed = rowKey === "reg" ? REG_KPI_IDS : INSP_KPI_IDS;
       if (allowed.indexOf(dragId) < 0) return false;
       const layoutKey = rowKey === "reg" ? "regSlots" : "inspSlots";
@@ -504,6 +510,12 @@
       return true;
     }
 
+    function isNeedsAttention(r) {
+      const insp = inspInfo(r);
+      const reg = regInfo(r);
+      return !!(insp && insp.n < 0) || !!(reg && reg.n < 0);
+    }
+
     function isColumnVisible(headerName) {
       if (Object.prototype.hasOwnProperty.call(state.layout.columns, headerName)) {
         return !!state.layout.columns[headerName];
@@ -613,6 +625,8 @@
         "reg-30": "Registration - 30 days",
         "reg-60": "Registration - 60 days",
         "reg-90": "Registration - 90 days",
+        "needs-attention": "Needs attention",
+        "fleet-ok": "Fleet OK",
         missing: "Missing 90-day date"
       };
       return map[filter] || filter;
@@ -630,6 +644,8 @@
       const insp = inspInfo(r);
       const reg = regInfo(r);
       if (!filter || filter === "fleet") return true;
+      if (filter === "needs-attention") return isNeedsAttention(r);
+      if (filter === "fleet-ok") return !isNeedsAttention(r);
       if (filter === "insp-overdue") return !!(insp && insp.n < 0);
       if (filter === "insp-week") return !!(insp && insp.n >= 0 && insp.n <= 7);
       if (filter === "insp-30") return !!(insp && insp.n >= 0 && insp.n <= 30);
@@ -675,11 +691,48 @@
         if (!matchesFilter(r, state.filter)) return;
         const insp = inspInfo(r);
         const reg = regInfo(r);
-        const info = useReg ? reg : insp;
+        let info = null;
+        let kind = "insp";
+        if (state.filter === "needs-attention") {
+          const inspOd = !!(insp && insp.n < 0);
+          const regOd = !!(reg && reg.n < 0);
+          if (inspOd && regOd) {
+            if (insp.n <= reg.n) {
+              info = insp;
+              kind = "insp";
+            } else {
+              info = reg;
+              kind = "reg";
+            }
+          } else if (inspOd) {
+            info = insp;
+            kind = "insp";
+          } else if (regOd) {
+            info = reg;
+            kind = "reg";
+          } else if (insp) {
+            info = insp;
+            kind = "insp";
+          } else if (reg) {
+            info = reg;
+            kind = "reg";
+          }
+        } else if (state.filter === "fleet-ok") {
+          if (insp) {
+            info = insp;
+            kind = "insp";
+          } else if (reg) {
+            info = reg;
+            kind = "reg";
+          }
+        } else {
+          info = useReg ? reg : insp;
+          kind = useReg ? "reg" : "insp";
+        }
         if (!info) return;
         /* default queue: inspections in next 45 days; filtered: matching horizon */
         if (!state.filter && info.n > 45) return;
-        queue.push({ idx, r, info, kind: useReg ? "reg" : "insp" });
+        queue.push({ idx, r, info, kind: kind });
       });
       queue.sort((a, b) => a.info.n - b.info.n);
 
@@ -688,6 +741,10 @@
         let title;
         if (!state.filter) {
           title = "90-day inspection queue";
+        } else if (state.filter === "needs-attention") {
+          title = "Needs attention queue - filtered: " + filterTitle(state.filter);
+        } else if (state.filter === "fleet-ok") {
+          title = "Fleet OK queue - filtered: " + filterTitle(state.filter);
         } else if (useReg) {
           title = "Registration queue - filtered: " + filterTitle(state.filter);
         } else if (isInspFilter(state.filter)) {
@@ -751,15 +808,20 @@
         "reg-30": 0,
         "reg-60": 0,
         "reg-90": 0,
+        "needs-attention": 0,
+        "fleet-ok": 0,
         missing: 0
       };
+      const totalUnits = rows().length;
       rows().forEach((r) => {
         if (!inspInfo(r)) counts.missing += 1;
+        if (isNeedsAttention(r)) counts["needs-attention"] += 1;
         Object.keys(counts).forEach((k) => {
-          if (k === "missing") return;
+          if (k === "missing" || k === "needs-attention" || k === "fleet-ok") return;
           if (matchesFilter(r, k)) counts[k] += 1;
         });
       });
+      counts["fleet-ok"] = totalUnits - counts["needs-attention"];
 
       const clickHint = "Click to filter - drop onto a slot in this row";
       function toneColor(id, n) {
@@ -770,13 +832,28 @@
         fleet: {
           cat: "",
           horizon: "Units",
-          value: rows().length,
+          value: totalUnits,
           color: "var(--accent)",
           hint:
-            counts["reg-overdue"] +
-            " registration" +
-            (counts["reg-overdue"] === 1 ? "" : "s") +
-            " overdue - click = all"
+            counts["needs-attention"] +
+            (counts["needs-attention"] === 1
+              ? " needs attention"
+              : " need attention") +
+            " - click = all"
+        },
+        "needs-attention": {
+          cat: "",
+          horizon: "Needs attention",
+          value: counts["needs-attention"],
+          color: counts["needs-attention"] ? "var(--red)" : "var(--good)",
+          hint: "Insp or reg overdue - click to filter"
+        },
+        "fleet-ok": {
+          cat: "",
+          horizon: "Fleet OK",
+          value: counts["fleet-ok"],
+          color: "var(--good)",
+          hint: "No insp/reg overdue - click to filter"
         },
         "insp-overdue": {
           cat: "Inspection",
@@ -853,16 +930,15 @@
       applyTheme(state.layout.theme);
       const slotRows = syncSlotsWithVisibility();
 
-      const unitsDef = defById.fleet;
-      const unitsHtml = kpi(
-        "fleet",
-        unitsDef.cat,
-        unitsDef.horizon,
-        unitsDef.value,
-        unitsDef.color,
-        unitsDef.hint,
-        { fixed: true }
-      );
+      function fixedKpiHtml(id) {
+        const d = defById[id];
+        if (!d || !isKpiVisible(id)) return "";
+        return kpi(id, d.cat, d.horizon, d.value, d.color, d.hint, { fixed: true });
+      }
+      const unitsHtml =
+        fixedKpiHtml("fleet") +
+        fixedKpiHtml("needs-attention") +
+        fixedKpiHtml("fleet-ok");
 
       function slotsHtmlFor(slots, rowKey) {
         return slots
@@ -890,7 +966,7 @@
       }
 
       $("kpis").innerHTML =
-        '<div class="kpi-row-units" id="kpiUnitsRow" aria-label="Units">' +
+        '<div class="kpi-row-units" id="kpiUnitsRow" aria-label="Units summary">' +
         unitsHtml +
         "</div>" +
         '<hr class="kpi-divider" aria-hidden="true" />' +
@@ -922,13 +998,16 @@
       const row = $("kpiUnitsRow");
       if (!row) return;
       row.querySelectorAll(".kpi").forEach((el) => {
-        el.onclick = () => {
-          setFilter("");
+        const apply = () => {
+          const id = el.dataset.kpi;
+          if (id === "fleet") setFilter("");
+          else setFilter(id || "");
         };
+        el.onclick = apply;
         el.onkeydown = (ev) => {
           if (ev.key === "Enter" || ev.key === " ") {
             ev.preventDefault();
-            setFilter("");
+            apply();
           }
         };
       });

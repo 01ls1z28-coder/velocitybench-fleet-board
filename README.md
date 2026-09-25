@@ -15,6 +15,8 @@ Local Excel to fleet KPIs and table. Open a workbook on this computer; the brows
 | KPI | Count |
 |-----|------:|
 | Units | 8 |
+| Needs attention | 3 |
+| Fleet OK | 5 |
 | Inspection · Overdue | 2 |
 | Inspection · 7 days | 2 |
 | Inspection · 30 days | 4 |
