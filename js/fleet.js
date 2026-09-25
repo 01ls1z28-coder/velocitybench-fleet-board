@@ -116,7 +116,7 @@
     ];
     /* Canonical default row order (Jorge): Overdue, 7, 30, 60, 90.
        Bump SLOTS_VERSION when defaults must replace older saved slot maps. */
-    const SLOTS_VERSION = 3;
+    const SLOTS_VERSION = 4;
 
     function defaultLayout() {
       const kpis = {};
@@ -185,17 +185,17 @@
 
     function defaultUnitsSlots() {
       /* Units, Needs attention, Fleet OK, No dates */
-      return UNITS_KPI_IDS.slice();
+      return ["fleet", "needs-attention", "fleet-ok", "no-dates"];
     }
 
     function defaultInspSlots() {
       /* Overdue, 7 days, 30 days, 60 days, 90 days */
-      return INSP_KPI_IDS.slice();
+      return ["insp-overdue", "insp-week", "insp-30", "insp-60", "insp-90"];
     }
 
     function defaultRegSlots() {
       /* Overdue, 7 days, 30 days, 60 days, 90 days */
-      return REG_KPI_IDS.slice();
+      return ["reg-overdue", "reg-week", "reg-30", "reg-60", "reg-90"];
     }
 
     function normalizeRowSlots(slots, allowedIds, legacyOrder) {
@@ -494,9 +494,9 @@
       }
       /* One-time: older saves may have experimental slot orders - restore canonical default. */
       if (savedLayout.slotsVersion !== SLOTS_VERSION) {
+        base.unitsSlots = defaultUnitsSlots();
         base.inspSlots = defaultInspSlots();
         base.regSlots = defaultRegSlots();
-        /* Keep unitsSlots when present; only reset if missing above. */
       }
       base.slotsVersion = SLOTS_VERSION;
       base.theme = normalizeTheme(savedLayout.theme);
