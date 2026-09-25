@@ -1,32 +1,29 @@
-# Dashboard
+# VelocityBench Dashboard (Fleet)
 
-Local Excel → flexible dashboard. Open any workbook on this computer; the browser builds KPIs and a table from your **header row**. **Nothing is uploaded.**
-
-## Live (after Pages deploy)
-
-https://01ls1z28-coder.github.io/velocitybench-fleet-board/
+Local Excel to fleet KPIs and table. Open a workbook on this computer; the browser builds the board from your header row. Nothing is uploaded.
 
 ## Features
 
-- **Generic layout (default):** any `.xlsx` / `.xls` / `.csv` → inferred column types, auto KPIs, searchable/sortable table, column show/hide
-- **Click-to-filter:** KPI cards and category chips toggle table filters (multi-select where natural; click again clears)
-- **Date horizons:** on every detected date column — Overdue / Next 7d / Next 30d / All
-- **Export view CSV:** download currently visible/filtered rows and visible columns only (client-side)
-- **Remember last workbook + view:** layout mode, sheet, column visibility, sort, and filters restored per workbook fingerprint (local only)
-- **Header actions** (no hamburger): Open another file, Choose export copy, Columns / Match columns, Use Fleet / generic layout, Export view CSV
-- **Fleet layout preset (optional):** detect Unit# / Reg.Exp / 90-day headers → KPIs, 90-day queue, drawer, status filters, column mapper; KPI cards filter queue + table
-- File System Access API (Chrome/Edge): live file handle, **Refresh**, Auto-check while the tab is visible
-- IndexedDB persistence of the file handle (re-permission on reopen when the browser allows)
-- Fallback file picker + drag-drop for Safari/Firefox (refresh re-prompts)
-- Excel lock banner on Windows when the .xlsx is open in Excel, with **Retry** and **Choose export copy**
-- Vendored SheetJS (`vendor/xlsx.full.min.js`) + `sample-fleet.xlsx` / `sample-orders.xlsx` for practice
+- Fleet layout: Unit# / Reg.Exp / 90-day inspection KPIs, inspection queue, drawer, status filters, column mapper
+- Click-to-filter: KPI cards and status dropdown use the same predicates (counts match the list)
+- Date horizons: Overdue / Due in 7 days / Due in 30 days (inclusive future windows; overdue separate)
+- Export view CSV: currently visible/filtered rows only (client-side)
+- Remember last workbook + view: sheet, filters, column map restored per workbook fingerprint (local only)
+
+## Sample (sample-fleet.xlsx on 2026-09-25)
+
+| KPI | Count |
+|-----|------:|
+| Units | 8 |
+| 90-day overdue | 2 |
+| Due in 7 days | 2 |
+| Due in 30 days | 4 |
+| Registration overdue (Units hint) | 1 |
 
 ## Run
 
-Static only — open `index.html` via a local server or `file://`. Chrome or Edge recommended for live Refresh.
-
-GitHub Pages: publish from repository root (or `/docs`). Enable Pages after review CLEAR (deploy agent).
+Open index.html locally (Chrome/Edge recommended), or serve the folder statically.
 
 ## Privacy
 
-The workbook is read only in this browser on this computer. Data stays local (IndexedDB / localStorage) and is never uploaded to a server.
+Dashboard reads your workbook only in this browser. Data stays on this computer.

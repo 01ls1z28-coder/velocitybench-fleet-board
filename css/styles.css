@@ -773,7 +773,7 @@ td.notes {
   .app { padding: 10px 12px; }
 }
 
-/* ── Phase 2: generic layout extras ── */
+/* ── Phase 2: layout extras ── */
 .banner.info {
   border-color: rgba(76, 201, 240, 0.45);
   background: rgba(76, 201, 240, 0.1);
@@ -801,7 +801,6 @@ td.notes {
 }
 
 .sheet-inline select,
-#sheetSelectGeneric,
 #sheetSelectFleet {
   background: var(--input-bg);
   color: var(--text);
@@ -956,13 +955,8 @@ th.sortable:hover {
   accent-color: var(--lime);
 }
 
-#kpisGeneric {
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-}
 
 @media (max-width: 900px) {
-  #kpisGeneric { grid-template-columns: 1fr 1fr; }
-}
 
 /* ── Phase 3: header actions (no hamburger) ── */
 .header {
@@ -995,7 +989,7 @@ th.sortable:hover {
   color: var(--accent);
 }
 
-/* Date horizon filters (generic — any date column) */
+/* Date horizon filters (any date column) */
 .date-horizons {
   display: flex;
   flex-direction: column;

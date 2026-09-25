@@ -21,9 +21,6 @@
         <button class="btn board-only hidden" type="button" id="openAnotherBtn">Open another file</button>
         <button class="btn board-only hidden" type="button" id="chooseExportBtn">Choose export copy</button>
         <button class="btn board-only fleet-only hidden" type="button" id="remapBtn">Match columns</button>
-        <button class="btn board-only fleet-only hidden" type="button" id="useGenericBtn">Use generic layout</button>
-        <button class="btn board-only generic-only hidden" type="button" id="colsBtn">Columns</button>
-        <button class="btn board-only generic-only fleet-available-only hidden" type="button" id="useFleetBtn">Use Fleet layout</button>
         <button class="btn board-only hidden" type="button" id="exportViewBtn">Export view CSV</button>
       </div>
     </header>
@@ -60,16 +57,6 @@
       </div>
     </div>
 
-    <div id="fleetSuggest" class="banner info hidden" role="status">
-      <div class="banner-text">
-        <strong>Fleet workbook detected.</strong>
-        Headers look like Unit# / Reg.Exp / 90-day inspection. Stay on the generic dashboard, or switch to the Fleet layout.
-      </div>
-      <div class="banner-actions">
-        <button class="btn btn-primary" type="button" id="acceptFleetBtn">Use Fleet layout</button>
-        <button class="btn" type="button" id="dismissFleetBtn">Keep generic</button>
-      </div>
-    </div>
 
     <section id="loader">
       <div class="hero-drop" id="drop">
@@ -90,58 +77,11 @@
         <div class="map-grid" id="mapGrid"></div>
         <div class="setup-actions">
           <button class="btn btn-primary" id="applyMap" type="button">Show fleet dashboard</button>
-          <button class="btn btn-ghost" id="setupGenericBtn" type="button">Use generic layout instead</button>
         </div>
       </div>
     </section>
 
-    <!-- Generic mode board (DEFAULT) -->
-    <section id="boardGeneric" class="hidden">
-      <div class="live-bar" id="liveBarGeneric">
-        <div class="live-meta">
-          <div class="file-name" id="fileNameGeneric">—</div>
-          <div class="file-hint" id="fileHintGeneric">Local workbook</div>
-        </div>
-        <div class="live-controls">
-          <label class="sheet-inline">Sheet
-            <select id="sheetSelectGeneric"></select>
-          </label>
-          <label class="toggle" title="Poll lastModified while this tab is visible">
-            <input type="checkbox" id="autoCheckGeneric" checked />
-            Auto-check
-          </label>
-          <button class="btn" type="button" id="refreshBtnGeneric">Refresh</button>
-        </div>
-      </div>
-
-      <div class="mode-pill" id="modePillGeneric">
-        <span class="pill">Generic layout</span>
-        <span class="pill-hint" id="genericHint">Dashboard from header row · types inferred</span>
-      </div>
-
-      <div class="kpis" id="kpisGeneric"></div>
-      <div class="date-horizons" id="dateHorizons"></div>
-      <div class="cat-chips" id="catChips"></div>
-
-      <div class="panel">
-        <div class="toolbar">
-          <input type="search" id="searchGeneric" placeholder="Search all visible columns…" autocomplete="off" />
-          <div class="col-panel hidden" id="colPanel">
-            <div class="col-panel-title">Visible columns</div>
-            <div id="colChecks"></div>
-          </div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead id="theadGeneric"></thead>
-            <tbody id="tbodyGeneric"></tbody>
-          </table>
-        </div>
-        <div class="table-foot" id="tableFootGeneric"></div>
-      </div>
-    </section>
-
-    <!-- Fleet preset board -->
+    <!-- Fleet board -->
     <section id="boardFleet" class="hidden">
       <div class="live-bar" id="liveBarFleet">
         <div class="live-meta">
@@ -203,7 +143,6 @@
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="js/fleet.js"></script>
-  <script src="js/generic.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

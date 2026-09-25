@@ -200,7 +200,6 @@
       drawMapper();
       $("setup").classList.remove("hidden");
       $("boardFleet").classList.add("hidden");
-      $("boardGeneric").classList.add("hidden");
       document.querySelectorAll(".board-only").forEach((el) => el.classList.remove("hidden"));
       api.syncMenuMode("fleet");
     }
@@ -319,11 +318,13 @@
       restoreView();
       $("setup").classList.add("hidden");
       $("boardFleet").classList.remove("hidden");
-      $("boardGeneric").classList.add("hidden");
       document.querySelectorAll(".board-only").forEach((el) => el.classList.remove("hidden"));
       api.updateLiveMeta("fleet");
       api.syncMenuMode("fleet");
 
+      /* KPI counts MUST match matchesFilter / statusFilter predicates so card
+         numbers equal the filtered list length. Future horizons are inclusive
+         and overlapping (7-day is a subset of 30-day); overdue is separate. */
       let overdue = 0,
         week = 0,
         thirty = 0,
@@ -331,14 +332,11 @@
         regOver = 0;
       rows().forEach((r) => {
         const insp = inspInfo(r);
-        const reg = regInfo(r);
         if (!insp) missing += 1;
-        else {
-          if (insp.n < 0) overdue += 1;
-          else if (insp.n <= 7) week += 1;
-          else if (insp.n <= 30) thirty += 1;
-        }
-        if (reg && reg.n < 0) regOver += 1;
+        if (matchesFilter(r, "insp-overdue")) overdue += 1;
+        if (matchesFilter(r, "insp-week")) week += 1;
+        if (matchesFilter(r, "insp-30")) thirty += 1;
+        if (matchesFilter(r, "reg-overdue")) regOver += 1;
       });
 
       $("kpis").innerHTML = [

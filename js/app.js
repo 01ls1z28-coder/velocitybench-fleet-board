@@ -1,4 +1,4 @@
-/* VelocityBench Dashboard — shell: FSA, IndexedDB, mode routing, Phase 3 persistence */
+/* VelocityBench Dashboard — shell: FSA, IndexedDB, Fleet-only routing, Phase 3 persistence */
 (function () {
   "use strict";
 
@@ -6,17 +6,31 @@
   const IDB_STORE = "handles";
   const IDB_KEY = "workbook";
   const POLL_MS = 4000;
-  const MODE_KEY_PREFIX = FleetBoardGeneric.MODE_KEY_PREFIX;
-  const DISMISS_KEY_PREFIX = "fleetboard-fleet-dismiss-v1:";
+  const MODE_KEY_PREFIX = "fleetboard-mode-v1:";
   const LAST_META_KEY = "dashboard-last-workbook-v1";
-  const VIEW_KEY_PREFIX = FleetBoardGeneric.VIEW_KEY_PREFIX;
+  const VIEW_KEY_PREFIX = "dashboard-view-v1:";
+
+  function headerHash(headers) {
+    const s = (headers || []).map((h) =>
+      String(h || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+    ).join("|");
+    let h = 2166136261;
+    for (let i = 0; i < s.length; i++) {
+      h ^= s.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return (h >>> 0).toString(16);
+  }
 
   const state = {
     wb: null,
     rows: [],
     headers: [],
     sheet: "",
-    mode: "generic", /* generic | fleet */
+    mode: "fleet", /* fleet only */
     fileHandle: null,
     fileName: "",
     fileSize: 0,
@@ -161,9 +175,6 @@
     if (text) $("restoreHintText").textContent = text;
   }
 
-  function setFleetSuggest(show) {
-    $("fleetSuggest").classList.toggle("hidden", !show);
-  }
 
   function updateLiveMeta() {
     let hint = "Local workbook";
@@ -173,27 +184,17 @@
       hint = "Fallback mode · re-choose file to refresh";
     }
     $("fileNameFleet").textContent = state.fileName || "Workbook";
-    $("fileNameGeneric").textContent = state.fileName || "Workbook";
     $("fileHintFleet").textContent = hint;
-    $("fileHintGeneric").textContent = hint;
   }
 
   function syncHeaderActions(mode) {
-    state.mode = mode;
+    state.mode = "fleet";
     state.boardOpen = true;
     document.querySelectorAll(".board-only").forEach((el) => {
       el.classList.remove("hidden");
     });
     document.querySelectorAll(".fleet-only").forEach((el) => {
-      el.classList.toggle("hidden", mode !== "fleet");
-    });
-    document.querySelectorAll(".generic-only").forEach((el) => {
-      el.classList.toggle("hidden", mode !== "generic");
-    });
-    /* Use Fleet layout only when fleet headers detected / previously available */
-    document.querySelectorAll(".fleet-available-only").forEach((el) => {
-      const showGeneric = mode === "generic" && state.fleetAvailable;
-      el.classList.toggle("hidden", !showGeneric);
+      el.classList.remove("hidden");
     });
   }
 
@@ -227,8 +228,8 @@
         const raw = localStorage.getItem(VIEW_KEY_PREFIX + state.fingerprint);
         if (raw) {
           const saved = JSON.parse(raw);
-          if (saved.layoutMode === "fleet" || saved.layoutMode === "generic") {
-            return saved.layoutMode;
+          if (saved.layoutMode === "fleet") {
+            return "fleet";
           }
         }
       } catch (_) { /* ignore */ }
@@ -253,19 +254,6 @@
     }
   }
 
-  function wasDismissed() {
-    try {
-      return localStorage.getItem(DISMISS_KEY_PREFIX + state.headerHash) === "1";
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function setDismissed() {
-    try {
-      localStorage.setItem(DISMISS_KEY_PREFIX + state.headerHash, "1");
-    } catch (_) { /* ignore */ }
-  }
 
   function showToastUpdated() {
     toast("Updated — refreshed");
@@ -282,16 +270,14 @@
     syncMenuMode,
     useSheet,
     afterSheetChange: () => {
-      state.headerHash = FleetBoardGeneric.headerHash(state.headers);
+      state.headerHash = headerHash(state.headers);
       state.fleetAvailable = FleetBoardFleet.looksLikeFleet(state.headers);
       saveLastMeta();
-      maybeSuggestFleet();
-      syncHeaderActions(state.mode);
+      syncHeaderActions("fleet");
     }
   };
 
   const fleet = FleetBoardFleet.create(api);
-  const generic = FleetBoardGeneric.create(api);
 
   /* ── File pick / load ── */
   async function pickWithFsa() {
@@ -376,9 +362,7 @@
     const opts = state.wb.SheetNames.map(
       (n) => `<option value="${n.replace(/"/g, "&quot;")}">${n.replace(/</g, "&lt;")}</option>`
     ).join("");
-    $("sheetSelectGeneric").innerHTML = opts;
     $("sheetSelectFleet").innerHTML = opts;
-    $("sheetSelectGeneric").value = state.sheet;
     $("sheetSelectFleet").value = state.sheet;
   }
 
@@ -432,45 +416,13 @@
         });
         return o;
       });
-    state.headerHash = FleetBoardGeneric.headerHash(state.headers);
+    state.headerHash = headerHash(state.headers);
     state.fleetAvailable = FleetBoardFleet.looksLikeFleet(state.headers);
   }
 
-  function maybeSuggestFleet() {
-    const isFleet = state.fleetAvailable;
-    if (
-      state.mode === "generic" &&
-      isFleet &&
-      loadModePreference() !== "fleet" &&
-      !wasDismissed()
-    ) {
-      setFleetSuggest(true);
-    } else {
-      setFleetSuggest(false);
-    }
-  }
-
   function routeAfterLoad() {
-    const pref = loadModePreference();
-    const isFleet = state.fleetAvailable;
-
-    if (pref === "fleet" && isFleet) {
-      enterFleet({ skipMapper: true });
-      setFleetSuggest(false);
-      return;
-    }
-
-    enterGeneric();
-    maybeSuggestFleet();
-  }
-
-  function enterGeneric() {
-    state.mode = "generic";
-    saveModePreference("generic");
-    setFleetSuggest(false);
-    fleet.closeDrawer();
-    generic.build();
-    syncHeaderActions("generic");
+    /* Fleet-only: always enter fleet (skip mapper when headers already mapped). */
+    enterFleet({ skipMapper: true });
   }
 
   function enterFleet(opts) {
@@ -478,7 +430,6 @@
     state.mode = "fleet";
     state.fleetAvailable = true;
     saveModePreference("fleet");
-    setFleetSuggest(false);
     fleet.activate({ skipMapper: !!opts.skipMapper });
     syncHeaderActions("fleet");
   }
@@ -508,11 +459,7 @@
   }
 
   function exportCurrentView() {
-    if (state.mode === "fleet") {
-      if (fleet.exportCurrentView) fleet.exportCurrentView();
-    } else {
-      if (generic.exportCurrentView) generic.exportCurrentView();
-    }
+    if (fleet.exportCurrentView) fleet.exportCurrentView();
     toast("Exported current view CSV");
   }
 
@@ -569,8 +516,7 @@
 
   function setAutoCheck(on) {
     state.autoCheck = !!on;
-    $("autoCheckGeneric").checked = state.autoCheck;
-    $("autoCheckFleet").checked = state.autoCheck;
+    if ($("autoCheckFleet")) $("autoCheckFleet").checked = state.autoCheck;
     if (state.autoCheck) startPoll();
     else stopPoll();
   }
@@ -606,16 +552,8 @@
   $("openAnotherBtn").onclick = () => openAnotherFile();
   $("chooseExportBtn").onclick = () => chooseExportCopy();
   $("exportViewBtn").onclick = () => exportCurrentView();
-  $("useFleetBtn").onclick = () => enterFleet({ skipMapper: false });
-  $("useGenericBtn").onclick = () => enterGeneric();
-  $("setupGenericBtn").onclick = () => enterGeneric();
-  $("acceptFleetBtn").onclick = () => enterFleet({ skipMapper: false });
-  $("dismissFleetBtn").onclick = () => {
-    setDismissed();
-    setFleetSuggest(false);
-  };
+  if ($("remapBtn")) $("remapBtn").onclick = () => enterFleet({ skipMapper: false });
 
-  $("refreshBtnGeneric").onclick = () => refreshWorkbook();
   $("refreshBtnFleet").onclick = () => refreshWorkbook();
   $("lockRetryBtn").onclick = () => refreshWorkbook();
   $("lockExportBtn").onclick = () => chooseExportCopy();
@@ -624,7 +562,6 @@
   $("restoreDismissBtn").onclick = () => {
     setRestoreHint(false);
   };
-  $("autoCheckGeneric").onchange = (e) => setAutoCheck(e.target.checked);
   $("autoCheckFleet").onchange = (e) => setAutoCheck(e.target.checked);
 
   /* Restore FSA handle on load when possible; else gentle prompt from last meta */
