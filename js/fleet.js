@@ -107,6 +107,9 @@
       "reg-60",
       "reg-90"
     ];
+    /* Canonical default row order (Jorge): Overdue, 7, 30, 60, 90.
+       Bump SLOTS_VERSION when defaults must replace older saved slot maps. */
+    const SLOTS_VERSION = 3;
 
     function defaultLayout() {
       const kpis = {};
@@ -121,7 +124,8 @@
         showQueue: true,
         inspSlots: defaultInspSlots(),
         regSlots: defaultRegSlots(),
-        theme: DEFAULT_THEME
+        theme: DEFAULT_THEME,
+        slotsVersion: SLOTS_VERSION
       };
     }
 
@@ -171,10 +175,12 @@
     }
 
     function defaultInspSlots() {
+      /* Overdue, 7 days, 30 days, 60 days, 90 days */
       return INSP_KPI_IDS.slice();
     }
 
     function defaultRegSlots() {
+      /* Overdue, 7 days, 30 days, 60 days, 90 days */
       return REG_KPI_IDS.slice();
     }
 
@@ -451,6 +457,12 @@
         base.inspSlots = defaultInspSlots();
         base.regSlots = defaultRegSlots();
       }
+      /* One-time: older saves may have experimental slot orders — restore canonical default. */
+      if (savedLayout.slotsVersion !== SLOTS_VERSION) {
+        base.inspSlots = defaultInspSlots();
+        base.regSlots = defaultRegSlots();
+      }
+      base.slotsVersion = SLOTS_VERSION;
       base.theme = normalizeTheme(savedLayout.theme);
       base.kpis.fleet = true; /* Units always on top */
       state.layout = base;
