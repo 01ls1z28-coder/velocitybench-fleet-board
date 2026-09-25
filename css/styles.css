@@ -939,9 +939,20 @@ html, body {
 
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
   align-items: stretch;
+}
+
+.kpi-row-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.section-divider {
+  margin: 10px 0 6px;
 }
 
 .kpi-slot {
@@ -1394,13 +1405,13 @@ td.notes {
 
 @media (max-width: 900px) {
   .kpi-group-grid { grid-template-columns: 1fr 1fr; }
-  .kpi-strip { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  .kpi-strip { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .q-item { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 560px) {
   .kpi-group-grid { grid-template-columns: 1fr; }
-  .kpi-strip { grid-template-columns: 1fr; }
+  .kpi-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .kpi-row-units { grid-template-columns: 1fr; }
   .app { padding: 10px 12px; }
 }

@@ -116,17 +116,19 @@
 
       <div class="mode-pill">
         <span class="pill accent">Fleet layout</span>
-        <span class="pill-hint">Units on top; drop horizon cards into a slot below</span>
+        <span class="pill-hint">Units on top; Inspection and Registration each have their own slot row</span>
       </div>
 
       <div class="kpis" id="kpis"></div>
 
+      <hr class="kpi-divider section-divider" id="queueDivider" aria-hidden="true" />
       <div class="queue" id="queueSection">
         <h3>90-day inspection queue</h3>
         <div id="dueList"></div>
       </div>
 
-      <div class="panel">
+      <hr class="kpi-divider section-divider" id="tableDivider" aria-hidden="true" />
+      <div class="panel" id="lowerTableBox">
         <div class="toolbar">
           <input type="search" id="search" placeholder="Search unit, driver, plate, notes..." autocomplete="off" />
           <select id="statusFilter">
@@ -190,7 +192,7 @@
       </section>
       <section class="layout-section">
         <h4>KPI cards</h4>
-        <p class="layout-hint">Units stays fixed on top. Drop horizon cards into a specific slot below the divider (swap if occupied). Toggles show or hide metric cards; hidden cards free their slot.</p>
+        <p class="layout-hint">Units stays fixed on top. Inspection and Registration each have a separate horizontal slot row (drag/swap only within that row). Toggles show or hide metric cards; hidden cards free their slot in that row.</p>
         <p class="layout-hint">Units card: always visible (fixed, not in slots).</p>
         <div class="layout-group">
           <label class="layout-check layout-master"><input type="checkbox" data-layout-group="inspection" /> Inspection (all)</label>

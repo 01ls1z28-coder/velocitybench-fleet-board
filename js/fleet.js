@@ -76,7 +76,7 @@
       "reg-60",
       "reg-90"
     ];
-    /* Units (fleet) is fixed on top; kpiSlots persists horizon card boxes. */
+    /* Units (fleet) is fixed on top; inspSlots + regSlots are separate rows. */
     const REORDERABLE_KPI_IDS = KPI_IDS.filter((id) => id !== "fleet");
     const DEFAULT_KPI_ORDER = REORDERABLE_KPI_IDS.slice();
     const THEME_IDS = [
@@ -119,7 +119,8 @@
         groups: { inspection: true, registration: true },
         columns: {},
         showQueue: true,
-        kpiSlots: defaultKpiSlots(),
+        inspSlots: defaultInspSlots(),
+        regSlots: defaultRegSlots(),
         theme: DEFAULT_THEME
       };
     }
@@ -169,23 +170,24 @@
       return out;
     }
 
-    const KPI_SLOT_COUNT = REORDERABLE_KPI_IDS.length;
-
-    function defaultKpiSlots() {
-      /* Default: packed default order into fixed slots (no empties). */
-      return DEFAULT_KPI_ORDER.slice();
+    function defaultInspSlots() {
+      return INSP_KPI_IDS.slice();
     }
 
-    function normalizeKpiSlots(slots, legacyOrder) {
-      /* Fixed-length slot map: kpiId or null. Allows empty slots; no auto-repack. */
-      const n = KPI_SLOT_COUNT;
+    function defaultRegSlots() {
+      return REG_KPI_IDS.slice();
+    }
+
+    function normalizeRowSlots(slots, allowedIds, legacyOrder) {
+      /* Fixed-length slot map for one row: kpiId or null. No auto-repack. */
+      const n = allowedIds.length;
       const out = [];
       for (let i = 0; i < n; i++) out.push(null);
       const seen = new Set();
 
       function tryPlace(id, prefer) {
         if (!id || id === "fleet") return;
-        if (REORDERABLE_KPI_IDS.indexOf(id) < 0) return;
+        if (allowedIds.indexOf(id) < 0) return;
         if (seen.has(id)) return;
         let idx = typeof prefer === "number" ? prefer : -1;
         if (idx < 0 || idx >= n || out[idx] != null) {
@@ -204,41 +206,80 @@
       } else if (Array.isArray(legacyOrder)) {
         legacyOrder.forEach((id) => tryPlace(id, -1));
       } else {
-        DEFAULT_KPI_ORDER.forEach((id) => tryPlace(id, -1));
+        allowedIds.forEach((id) => tryPlace(id, -1));
       }
       return out;
     }
 
-    function syncSlotsWithVisibility() {
-      /* Hidden cards free their slot (stable grid; empties stay). Newly shown
-         cards take the first empty slot so toggling back prefers the same box
-         when nothing else claimed it. */
-      const slots = normalizeKpiSlots(state.layout.kpiSlots);
-      REORDERABLE_KPI_IDS.forEach((id) => {
-        const idx = slots.indexOf(id);
-        if (!isKpiVisible(id)) {
-          if (idx >= 0) slots[idx] = null;
-        } else if (idx < 0) {
-          const empty = slots.indexOf(null);
-          if (empty >= 0) slots[empty] = id;
-        }
+    function splitUnifiedIntoRows(unified) {
+      /* Migrate old mixed kpiSlots / kpiOrder into insp + reg rows. */
+      const inspOrder = [];
+      const regOrder = [];
+      const seenInsp = new Set();
+      const seenReg = new Set();
+      if (Array.isArray(unified)) {
+        unified.forEach((id) => {
+          if (!id || id === "fleet" || id === "" || id === "empty") return;
+          if (INSP_KPI_IDS.indexOf(id) >= 0 && !seenInsp.has(id)) {
+            seenInsp.add(id);
+            inspOrder.push(id);
+          } else if (REG_KPI_IDS.indexOf(id) >= 0 && !seenReg.has(id)) {
+            seenReg.add(id);
+            regOrder.push(id);
+          }
+        });
+      }
+      /* Fill remainder in default row order so every card has a home. */
+      INSP_KPI_IDS.forEach((id) => {
+        if (!seenInsp.has(id)) inspOrder.push(id);
       });
-      state.layout.kpiSlots = slots;
-      return slots;
+      REG_KPI_IDS.forEach((id) => {
+        if (!seenReg.has(id)) regOrder.push(id);
+      });
+      return {
+        inspSlots: normalizeRowSlots(null, INSP_KPI_IDS, inspOrder),
+        regSlots: normalizeRowSlots(null, REG_KPI_IDS, regOrder)
+      };
     }
 
-    function placeCardInSlot(dragId, targetSlotIndex) {
+    function syncRowSlotsWithVisibility(slots, allowedIds) {
+      const next = normalizeRowSlots(slots, allowedIds);
+      allowedIds.forEach((id) => {
+        const idx = next.indexOf(id);
+        if (!isKpiVisible(id)) {
+          if (idx >= 0) next[idx] = null;
+        } else if (idx < 0) {
+          const empty = next.indexOf(null);
+          if (empty >= 0) next[empty] = id;
+        }
+      });
+      return next;
+    }
+
+    function syncSlotsWithVisibility() {
+      /* Hidden cards free their slot within that row only. */
+      const insp = syncRowSlotsWithVisibility(state.layout.inspSlots, INSP_KPI_IDS);
+      const reg = syncRowSlotsWithVisibility(state.layout.regSlots, REG_KPI_IDS);
+      state.layout.inspSlots = insp;
+      state.layout.regSlots = reg;
+      return { inspSlots: insp, regSlots: reg };
+    }
+
+    function placeCardInSlot(dragId, rowKey, targetSlotIndex) {
       if (!dragId || dragId === "fleet") return false;
-      const slots = normalizeKpiSlots(state.layout.kpiSlots);
+      const allowed = rowKey === "reg" ? REG_KPI_IDS : INSP_KPI_IDS;
+      if (allowed.indexOf(dragId) < 0) return false;
+      const layoutKey = rowKey === "reg" ? "regSlots" : "inspSlots";
+      const slots = normalizeRowSlots(state.layout[layoutKey], allowed);
       const from = slots.indexOf(dragId);
       if (from < 0) return false;
       const to = targetSlotIndex | 0;
       if (to < 0 || to >= slots.length) return false;
       if (from === to) return false;
-      const other = slots[to]; /* null = empty; else swap */
+      const other = slots[to]; /* null = empty; else swap within row */
       slots[to] = dragId;
       slots[from] = other;
-      state.layout.kpiSlots = slots;
+      state.layout[layoutKey] = slots;
       persistView();
       buildBoard();
       return true;
@@ -349,7 +390,8 @@
               groups: Object.assign({}, state.layout.groups),
               columns: Object.assign({}, state.layout.columns),
               showQueue: !!state.layout.showQueue,
-              kpiSlots: normalizeKpiSlots(state.layout.kpiSlots),
+              inspSlots: normalizeRowSlots(state.layout.inspSlots, INSP_KPI_IDS),
+              regSlots: normalizeRowSlots(state.layout.regSlots, REG_KPI_IDS),
               theme: normalizeTheme(state.layout.theme)
             }
           })
@@ -388,13 +430,26 @@
       if (typeof savedLayout.showQueue === "boolean") {
         base.showQueue = savedLayout.showQueue;
       }
-      if (Array.isArray(savedLayout.kpiSlots)) {
-        base.kpiSlots = normalizeKpiSlots(savedLayout.kpiSlots);
+      if (Array.isArray(savedLayout.inspSlots) || Array.isArray(savedLayout.regSlots)) {
+        base.inspSlots = Array.isArray(savedLayout.inspSlots)
+          ? normalizeRowSlots(savedLayout.inspSlots, INSP_KPI_IDS)
+          : defaultInspSlots();
+        base.regSlots = Array.isArray(savedLayout.regSlots)
+          ? normalizeRowSlots(savedLayout.regSlots, REG_KPI_IDS)
+          : defaultRegSlots();
+      } else if (Array.isArray(savedLayout.kpiSlots)) {
+        /* Migrate unified mixed slots into separate rows. */
+        const split = splitUnifiedIntoRows(savedLayout.kpiSlots);
+        base.inspSlots = split.inspSlots;
+        base.regSlots = split.regSlots;
       } else if (Array.isArray(savedLayout.kpiOrder)) {
-        /* Migrate legacy packed kpiOrder into fixed slots. */
-        base.kpiSlots = normalizeKpiSlots(null, savedLayout.kpiOrder);
+        /* Migrate legacy packed kpiOrder into separate rows. */
+        const split = splitUnifiedIntoRows(savedLayout.kpiOrder);
+        base.inspSlots = split.inspSlots;
+        base.regSlots = split.regSlots;
       } else {
-        base.kpiSlots = defaultKpiSlots();
+        base.inspSlots = defaultInspSlots();
+        base.regSlots = defaultRegSlots();
       }
       base.theme = normalizeTheme(savedLayout.theme);
       base.kpis.fleet = true; /* Units always on top */
@@ -694,7 +749,7 @@
         });
       });
 
-      const clickHint = "Click to filter - drop onto a slot";
+      const clickHint = "Click to filter - drop onto a slot in this row";
       function toneColor(id, n) {
         if (id.indexOf("overdue") >= 0) return n ? "var(--red)" : "var(--good)";
         return n ? "var(--warn)" : "var(--good)";
@@ -784,7 +839,7 @@
       };
 
       applyTheme(state.layout.theme);
-      const slots = syncSlotsWithVisibility();
+      const rows = syncSlotsWithVisibility();
 
       const unitsDef = defById.fleet;
       const unitsHtml = kpi(
@@ -797,37 +852,52 @@
         { fixed: true }
       );
 
-      const slotsHtml = slots
-        .map((id, slotIndex) => {
-          const d = id ? defById[id] : null;
-          const showCard = !!(d && isKpiVisible(id));
-          const inner = showCard
-            ? kpi(id, d.cat, d.horizon, d.value, d.color, d.hint, { fixed: false })
-            : '<div class="kpi-slot-empty" aria-hidden="true"><div class="lbl">Empty slot</div></div>';
-          return (
-            '<div class="kpi-slot' +
-            (showCard ? "" : " kpi-slot-vacant") +
-            '" data-slot="' +
-            slotIndex +
-            '" data-kpi-slot="' +
-            (showCard ? id : "") +
-            '">' +
-            inner +
-            "</div>"
-          );
-        })
-        .join("");
+      function slotsHtmlFor(slots, rowKey) {
+        return slots
+          .map((id, slotIndex) => {
+            const d = id ? defById[id] : null;
+            const showCard = !!(d && isKpiVisible(id));
+            const inner = showCard
+              ? kpi(id, d.cat, d.horizon, d.value, d.color, d.hint, { fixed: false })
+              : '<div class="kpi-slot-empty" aria-hidden="true"><div class="lbl">Empty slot</div></div>';
+            return (
+              '<div class="kpi-slot' +
+              (showCard ? "" : " kpi-slot-vacant") +
+              '" data-slot-row="' +
+              rowKey +
+              '" data-slot="' +
+              slotIndex +
+              '" data-kpi-slot="' +
+              (showCard ? id : "") +
+              '">' +
+              inner +
+              "</div>"
+            );
+          })
+          .join("");
+      }
 
       $("kpis").innerHTML =
         '<div class="kpi-row-units" id="kpiUnitsRow" aria-label="Units">' +
         unitsHtml +
         "</div>" +
         '<hr class="kpi-divider" aria-hidden="true" />' +
-        '<div class="kpi-strip" id="kpiStrip" aria-label="Horizon KPI slots - drop a card into a box">' +
-        slotsHtml +
+        '<div class="kpi-group kpi-row-section" id="kpiInspSection">' +
+        '<div class="kpi-group-label">Inspection</div>' +
+        '<div class="kpi-strip kpi-strip-insp" id="kpiStripInsp" data-slot-row="insp" aria-label="Inspection KPI slots">' +
+        slotsHtmlFor(rows.inspSlots, "insp") +
+        "</div>" +
+        "</div>" +
+        '<hr class="kpi-divider" aria-hidden="true" />' +
+        '<div class="kpi-group kpi-row-section" id="kpiRegSection">' +
+        '<div class="kpi-group-label">Registration</div>' +
+        '<div class="kpi-strip kpi-strip-reg" id="kpiStripReg" data-slot-row="reg" aria-label="Registration KPI slots">' +
+        slotsHtmlFor(rows.regSlots, "reg") +
+        "</div>" +
         "</div>";
 
-      wireKpiInteractions();
+      wireKpiInteractions($("kpiStripInsp"), "insp");
+      wireKpiInteractions($("kpiStripReg"), "reg");
       wireUnitsClick();
 
       applyLayoutToDom();
@@ -852,9 +922,9 @@
       });
     }
 
-    function wireKpiInteractions() {
-      const strip = $("kpiStrip");
-      if (!strip) return;
+    function wireKpiInteractions(strip, rowKey) {
+      if (!strip || !rowKey) return;
+      const allowed = rowKey === "reg" ? REG_KPI_IDS : INSP_KPI_IDS;
       let dragId = null;
       let didDrag = false;
 
@@ -867,7 +937,9 @@
       function slotElFromEvent(ev) {
         const t = ev.target;
         if (!t || !t.closest) return null;
-        return t.closest(".kpi-slot");
+        const slot = t.closest(".kpi-slot");
+        if (!slot || slot.getAttribute("data-slot-row") !== rowKey) return null;
+        return slot;
       }
 
       function highlightSlot(ev) {
@@ -876,9 +948,20 @@
         if (slot) slot.classList.add("drag-over");
       }
 
+      function acceptsDrag(id) {
+        return !!(id && allowed.indexOf(id) >= 0);
+      }
+
       strip.querySelectorAll(".kpi.kpi-draggable").forEach((el) => {
         el.addEventListener("dragstart", (ev) => {
           dragId = el.dataset.kpi;
+          if (!acceptsDrag(dragId)) {
+            dragId = null;
+            try {
+              ev.preventDefault();
+            } catch (_) { /* ignore */ }
+            return;
+          }
           didDrag = false;
           el.classList.add("dragging");
           strip.classList.add("is-dragging");
@@ -924,6 +1007,7 @@
 
       strip.querySelectorAll(".kpi-slot").forEach((slot) => {
         slot.addEventListener("dragover", (ev) => {
+          if (!acceptsDrag(dragId)) return;
           ev.preventDefault();
           ev.stopPropagation();
           try {
@@ -931,12 +1015,11 @@
           } catch (_) {
             /* ignore */
           }
-          if (!dragId) return;
           highlightSlot(ev);
         });
         slot.addEventListener("dragenter", (ev) => {
+          if (!acceptsDrag(dragId)) return;
           ev.preventDefault();
-          if (!dragId) return;
           highlightSlot(ev);
         });
         slot.addEventListener("dragleave", (ev) => {
@@ -956,8 +1039,8 @@
           clearSlotHighlight();
           strip.classList.remove("is-dragging");
           const idx = parseInt(slot.getAttribute("data-slot"), 10);
-          if (!id || isNaN(idx)) return;
-          placeCardInSlot(id, idx);
+          if (!acceptsDrag(id) || isNaN(idx)) return;
+          placeCardInSlot(id, rowKey, idx);
         });
       });
     }
@@ -965,9 +1048,14 @@
 
     function applyLayoutToDom() {
       const q = $("queueSection");
+      const qDiv = $("queueDivider");
       if (q) {
         if (state.layout.showQueue) q.classList.remove("hidden");
         else q.classList.add("hidden");
+      }
+      if (qDiv) {
+        if (state.layout.showQueue) qDiv.classList.remove("hidden");
+        else qDiv.classList.add("hidden");
       }
       ensureOneColumnVisible();
     }
