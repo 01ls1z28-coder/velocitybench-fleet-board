@@ -457,7 +457,7 @@
         base.inspSlots = defaultInspSlots();
         base.regSlots = defaultRegSlots();
       }
-      /* One-time: older saves may have experimental slot orders — restore canonical default. */
+      /* One-time: older saves may have experimental slot orders - restore canonical default. */
       if (savedLayout.slotsVersion !== SLOTS_VERSION) {
         base.inspSlots = defaultInspSlots();
         base.regSlots = defaultRegSlots();
