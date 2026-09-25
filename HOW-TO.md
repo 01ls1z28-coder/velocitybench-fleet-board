@@ -13,10 +13,10 @@ Each card count uses the **same rule** as its filter. Future horizons overlap (7
 | Card | Rule |
 |------|------|
 | Units | All rows |
-| Inspection · Overdue | Inspection date before today |
-| Inspection · 7 / 30 / 90 days | Inspection due today through +N days (inclusive) |
-| Registration · Overdue | Registration date before today |
-| Registration · 7 / 30 / 90 days | Registration due today through +N days (inclusive) |
+| Inspection - Overdue | Inspection date before today |
+| Inspection - 7 / 30 / 60 / 90 days | Inspection due today through +N days (inclusive) |
+| Registration - Overdue | Registration date before today |
+| Registration - 7 / 30 / 60 / 90 days | Registration due today through +N days (inclusive) |
 
 ## Privacy
 
@@ -24,5 +24,5 @@ Your workbook is read only in this browser. Nothing is uploaded.
 
 ## Customize layout
 
-Click **Customize** (next to Refresh) to show or hide KPI cards, table columns, and the due queue. Choices save on this browser with your view. **Reset to defaults** restores the full layout.
+Click **Customize** (next to Refresh) to show or hide KPI cards, table columns, and the due queue. Drag KPI cards on the board to reorder; they snap into the grid. Choices (including order) save on this browser with your view. **Reset to defaults** restores the full layout and default card order.
 

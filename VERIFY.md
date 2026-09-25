@@ -1,4 +1,4 @@
-# Verify — KPI boxes (Inspection + Registration) + Fleet-only
+# Verify - KPI boxes (Inspection + Registration) + Fleet-only
 
 ## KPI vs filter (sample-fleet.xlsx, today = 2026-09-25)
 
@@ -10,12 +10,14 @@ Inclusive overlapping future horizons; overdue separate. Counts use the same `ma
 | insp-overdue | 2 | 108 (−7), 162 (−3) |
 | insp-week | 2 | 130 (2), 122 (7) |
 | insp-30 | 4 | 130 (2), 122 (7), 155 (17), 101 (20) |
+| insp-60 | 5 | +114 (43); excludes 141 (69) |
 | insp-90 | 6 | +114 (43), 141 (69) |
 | reg-overdue | 1 | 122 (reg −10) |
 | reg-week | 1 | 155 (reg 4) |
 | reg-30 | 2 | 155 (4), 108 (11) |
+| reg-60 | 3 | +130 (32); excludes 162 (89) |
 | reg-90 | 4 | +130 (32), 162 (89) |
-| missing | 0 | — |
+| missing | 0 | - |
 
 ## Layout
 
@@ -47,3 +49,8 @@ Click any fleet table `<th>` to sort visible/filtered rows. Same header toggles 
 ## Customize layout (2026-09-25)
 
 **Customize** opens a local panel to show/hide KPI cards, table columns, and due queue. Persisted in `dashboard-fleet-view-v1:` with sort. Defaults = full layout. Local-only / no Pages push until approved. See `/workspace/dashboard-kpi-fix/CUSTOMIZE-LAYOUT.md`.
+
+
+## 60-day + drag reorder + brass (2026-09-25)
+
+`insp-60` / `reg-60` inclusive horizons; unified KPI strip with drag-snap order in `kpiOrder`; brass chrome. Local-only / no Pages push. See `/workspace/dashboard-kpi-fix/KPI-60-DND.md`.
