@@ -918,9 +918,9 @@ html, body {
 
 .kpi-row-units {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 280px));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 260px));
   gap: 12px;
-  max-width: 960px;
+  max-width: 1120px;
 }
 
 .kpi-divider {
@@ -1194,6 +1194,7 @@ html, body {
 .days.bad { color: var(--red); }
 .days.warn { color: var(--warn); }
 .days.good { color: var(--good); }
+.days.muted { color: var(--text-muted); }
 
 /* -- Table -- */
 .toolbar {

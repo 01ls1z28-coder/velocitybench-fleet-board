@@ -116,7 +116,7 @@
 
       <div class="mode-pill">
         <span class="pill accent">Fleet layout</span>
-        <span class="pill-hint">Units / Needs attention / Fleet OK on top; Inspection and Registration each have their own slot row</span>
+        <span class="pill-hint">Units / Needs attention / Fleet OK / No dates on top; Inspection and Registration each have their own slot row</span>
       </div>
 
       <div class="kpis" id="kpis"></div>
@@ -135,6 +135,7 @@
             <option value="">All units</option>
             <option value="needs-attention">Needs attention</option>
             <option value="fleet-ok">Fleet OK</option>
+            <option value="no-dates">No dates</option>
             <option value="insp-overdue">Inspection - Overdue</option>
             <option value="insp-week">Inspection - 7 days</option>
             <option value="insp-30">Inspection - 30 days</option>
@@ -194,11 +195,12 @@
       </section>
       <section class="layout-section">
         <h4>KPI cards</h4>
-        <p class="layout-hint">Units / Needs attention / Fleet OK stay fixed on top (not in slots). Inspection and Registration each have a separate horizontal slot row (drag/swap only within that row). Toggles show or hide metric cards; hidden horizon cards free their slot in that row.</p>
-        <p class="layout-hint">Units card: always visible. Needs attention and Fleet OK: optional (default on).</p>
+        <p class="layout-hint">Units / Needs attention / Fleet OK / No dates stay fixed on top (not in slots). Inspection and Registration each have a separate horizontal slot row (drag/swap only within that row). Toggles show or hide metric cards; hidden horizon cards free their slot in that row.</p>
+        <p class="layout-hint">Units card: always visible. Needs attention, Fleet OK, and No dates: optional (default on).</p>
         <div class="layout-group">
           <label class="layout-check"><input type="checkbox" data-layout-kpi="needs-attention" /> Needs attention</label>
           <label class="layout-check"><input type="checkbox" data-layout-kpi="fleet-ok" /> Fleet OK</label>
+          <label class="layout-check"><input type="checkbox" data-layout-kpi="no-dates" /> No dates</label>
         </div>
         <div class="layout-group">
           <label class="layout-check layout-master"><input type="checkbox" data-layout-group="inspection" /> Inspection (all)</label>
