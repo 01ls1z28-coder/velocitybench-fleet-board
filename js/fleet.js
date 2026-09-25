@@ -81,6 +81,31 @@
       return state.map[key] ? row[state.map[key]] : "";
     }
 
+    /* Workbook columns for table/export: all non-blank headers in file order.
+       Duplicate header names collide on row object keys (last write wins at parse);
+       display keeps first occurrence only to match usable keys. */
+    function tableColumns() {
+      const seen = new Set();
+      const cols = [];
+      headers().forEach((h) => {
+        const name = String(h == null ? "" : h).trim();
+        if (!name) return;
+        if (seen.has(name)) return;
+        seen.add(name);
+        cols.push(name);
+      });
+      return cols;
+    }
+
+    function fieldKeyForHeader(headerName) {
+      const keys = Object.keys(state.map);
+      for (let i = 0; i < keys.length; i++) {
+        const k = keys[i];
+        if (state.map[k] === headerName) return k;
+      }
+      return null;
+    }
+
     function parseDate(v) {
       if (!v) return null;
       if (v instanceof Date && !isNaN(v)) return v;
@@ -308,20 +333,22 @@
 
       const h3 = $("dueList").parentElement.querySelector("h3");
       if (h3) {
+        let title;
         if (!state.filter) {
-          h3.textContent = "90-day inspection queue";
+          title = "90-day inspection queue";
         } else if (useReg) {
-          h3.textContent = "Registration queue · filtered: " + filterTitle(state.filter);
+          title = "Registration queue · filtered: " + filterTitle(state.filter);
         } else if (isInspFilter(state.filter)) {
-          h3.textContent = "Inspection queue · filtered: " + filterTitle(state.filter);
+          title = "Inspection queue · filtered: " + filterTitle(state.filter);
         } else {
-          h3.textContent = "Queue · filtered: " + filterTitle(state.filter);
+          title = "Queue · filtered: " + filterTitle(state.filter);
         }
+        if (queue.length) title += " - Showing " + queue.length;
+        h3.textContent = title;
       }
 
       $("dueList").innerHTML =
         queue
-          .slice(0, 12)
           .map(
             ({ idx, r, info }) => `
         <div class="q-item" data-idx="${idx}">
@@ -438,9 +465,7 @@
         .filter(({ r }) => {
           if (!matchesFilter(r, state.filter)) return false;
           if (!q) return true;
-          return ["id", "year", "make", "plate", "vid", "driver", "notes"].some((k) =>
-            norm(val(r, k)).includes(q)
-          );
+          return tableColumns().some((h) => norm(r[h]).includes(q));
         })
         .sort((a, b) => {
           const an = inspInfo(a.r),
@@ -453,29 +478,17 @@
     }
 
     function renderTable() {
-      const cols = ["id", "insp", "year", "make", "driver", "reg", "plate", "vid", "notes"].filter(
-        (k) => state.map[k]
-      );
-      const labels = {
-        id: "Unit#",
-        year: "Year",
-        make: "MAKE/MODEL",
-        plate: "License#",
-        vid: "Vehicle ID#",
-        reg: "Reg. Exp",
-        insp: "90 Day Insp.",
-        driver: "Driver",
-        notes: "Notes"
-      };
+      const cols = tableColumns();
       const list = visibleRows();
       $("thead").innerHTML =
-        "<tr>" + cols.map((k) => `<th>${labels[k]}</th>`).join("") + "</tr>";
+        "<tr>" + cols.map((h) => `<th title="${escapeAttr(h)}">${escapeHtml(h)}</th>`).join("") + "</tr>";
       $("tbody").innerHTML = list
         .map(({ r, idx }) => {
           const cells = cols
-            .map((k) => {
-              if (k === "insp" || k === "reg") {
-                const info = k === "insp" ? inspInfo(r) : regInfo(r);
+            .map((h) => {
+              const fieldKey = fieldKeyForHeader(h);
+              if (fieldKey === "insp" || fieldKey === "reg") {
+                const info = fieldKey === "insp" ? inspInfo(r) : regInfo(r);
                 if (!info)
                   return `<td><span class="chip muted">No date</span></td>`;
                 return `<td><span class="chip ${tone(
@@ -484,11 +497,14 @@
                   info.n
                 )}</div></td>`;
               }
-              if (k === "make")
-                return `<td class="wrap">${escapeHtml(String(val(r, k) || "—"))}</td>`;
-              if (k === "notes")
-                return `<td class="notes">${escapeHtml(String(val(r, k) || "—"))}</td>`;
-              return `<td>${escapeHtml(String(val(r, k) || "—"))}</td>`;
+              const raw = r[h] == null ? "" : r[h];
+              const s = String(raw);
+              const display = s.trim() === "" ? "—" : s;
+              if (fieldKey === "make")
+                return `<td class="wrap">${escapeHtml(display)}</td>`;
+              if (fieldKey === "notes")
+                return `<td class="notes">${escapeHtml(display)}</td>`;
+              return `<td>${escapeHtml(display)}</td>`;
             })
             .join("");
           return `<tr data-idx="${idx}" class="${
@@ -544,32 +560,20 @@
     }
 
     function exportCurrentView() {
-      const cols = ["id", "insp", "year", "make", "driver", "reg", "plate", "vid", "notes"].filter(
-        (k) => state.map[k]
-      );
-      const labels = {
-        id: "Unit#",
-        year: "Year",
-        make: "MAKE/MODEL",
-        plate: "License#",
-        vid: "Vehicle ID#",
-        reg: "Reg. Exp",
-        insp: "90 Day Insp.",
-        driver: "Driver",
-        notes: "Notes"
-      };
+      const cols = tableColumns();
       const list = visibleRows();
       const lines = [];
-      lines.push(cols.map((k) => csvEscape(labels[k])).join(","));
+      lines.push(cols.map((h) => csvEscape(h)).join(","));
       list.forEach(({ r }) => {
         lines.push(
           cols
-            .map((k) => {
-              if (k === "insp" || k === "reg") {
-                const info = k === "insp" ? inspInfo(r) : regInfo(r);
+            .map((h) => {
+              const fieldKey = fieldKeyForHeader(h);
+              if (fieldKey === "insp" || fieldKey === "reg") {
+                const info = fieldKey === "insp" ? inspInfo(r) : regInfo(r);
                 return csvEscape(info ? info.date.toISOString().slice(0, 10) : "");
               }
-              return csvEscape(val(r, k));
+              return csvEscape(r[h] == null ? "" : r[h]);
             })
             .join(",")
         );

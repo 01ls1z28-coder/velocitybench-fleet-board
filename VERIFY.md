@@ -35,3 +35,7 @@ Inclusive overlapping future horizons; overdue separate. Counts use the same `ma
 - [ ] Queue title names Inspection vs Registration correctly when filtered
 - [ ] No "generic" controls in UI
 - [ ] Offline twins: ASCII max ord 126; no CDN/`fetch(`/`script src=`; OOXML `http://schemas...` literals OK
+
+## All columns (2026-09-25)
+
+Table shows every non-blank workbook header; KPIs remain mapped insp/reg via `matchesFilter`. Queue uncapped (`Showing N`). Offline twins ASCII max ord 126; OOXML namespace literals OK. See `/workspace/dashboard-kpi-fix/ALL-COLUMNS.md`.
