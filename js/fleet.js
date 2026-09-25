@@ -76,7 +76,23 @@
       "reg-60",
       "reg-90"
     ];
-    const DEFAULT_KPI_ORDER = KPI_IDS.slice();
+    /* Units (fleet) is fixed on top; kpiOrder persists only horizon cards. */
+    const REORDERABLE_KPI_IDS = KPI_IDS.filter((id) => id !== "fleet");
+    const DEFAULT_KPI_ORDER = REORDERABLE_KPI_IDS.slice();
+    const THEME_IDS = [
+      "dark",
+      "dark-brass",
+      "midnight",
+      "graphite",
+      "forest",
+      "ocean",
+      "ember",
+      "copper",
+      "plum",
+      "high-contrast",
+      "soft-light"
+    ];
+    const DEFAULT_THEME = "dark";
     const INSP_KPI_IDS = [
       "insp-overdue",
       "insp-week",
@@ -97,13 +113,38 @@
       KPI_IDS.forEach((id) => {
         kpis[id] = true;
       });
+      kpis.fleet = true; /* Units always shown */
       return {
         kpis: kpis,
         groups: { inspection: true, registration: true },
         columns: {},
         showQueue: true,
-        kpiOrder: DEFAULT_KPI_ORDER.slice()
+        kpiOrder: DEFAULT_KPI_ORDER.slice(),
+        theme: DEFAULT_THEME
       };
+    }
+
+    function normalizeTheme(theme) {
+      if (typeof theme === "string" && THEME_IDS.indexOf(theme) >= 0) return theme;
+      return DEFAULT_THEME;
+    }
+
+    function applyTheme(theme) {
+      const id = normalizeTheme(theme);
+      state.layout.theme = id;
+      try {
+        document.documentElement.setAttribute("data-theme", id);
+      } catch (_) { /* ignore */ }
+      const sel = $("themeSelect");
+      if (sel && sel.value !== id) sel.value = id;
+      const panel = $("layoutPanel");
+      if (panel) {
+        panel.querySelectorAll('input[name="layoutTheme"]').forEach((inp) => {
+          inp.checked = inp.value === id;
+          const lab = inp.closest(".theme-option");
+          if (lab) lab.classList.toggle("active", inp.value === id);
+        });
+      }
     }
 
     function normalizeKpiOrder(order) {
@@ -111,7 +152,8 @@
       const out = [];
       if (Array.isArray(order)) {
         order.forEach((id) => {
-          if (KPI_IDS.indexOf(id) >= 0 && !seen.has(id)) {
+          if (id === "fleet") return; /* Units fixed; never in reorder list */
+          if (REORDERABLE_KPI_IDS.indexOf(id) >= 0 && !seen.has(id)) {
             seen.add(id);
             out.push(id);
           }
@@ -231,7 +273,8 @@
               groups: Object.assign({}, state.layout.groups),
               columns: Object.assign({}, state.layout.columns),
               showQueue: !!state.layout.showQueue,
-              kpiOrder: normalizeKpiOrder(state.layout.kpiOrder)
+              kpiOrder: normalizeKpiOrder(state.layout.kpiOrder),
+              theme: normalizeTheme(state.layout.theme)
             }
           })
         );
@@ -270,6 +313,8 @@
         base.showQueue = savedLayout.showQueue;
       }
       base.kpiOrder = normalizeKpiOrder(savedLayout.kpiOrder);
+      base.theme = normalizeTheme(savedLayout.theme);
+      base.kpis.fleet = true; /* Units always on top */
       state.layout = base;
     }
 
@@ -296,11 +341,13 @@
           state.sortDir = "asc";
         }
         applySavedLayout(saved.layout);
+        applyTheme(state.layout.theme);
         if ($("statusFilter")) $("statusFilter").value = state.filter;
       } catch (_) { /* ignore */ }
     }
 
     function isKpiVisible(id) {
+      if (id === "fleet") return true; /* Units always visible */
       if (!state.layout.kpis[id]) return false;
       if (INSP_KPI_IDS.indexOf(id) >= 0 && !state.layout.groups.inspection) return false;
       if (REG_KPI_IDS.indexOf(id) >= 0 && !state.layout.groups.registration) return false;
@@ -330,6 +377,7 @@
 
     function resetLayoutDefaults() {
       state.layout = defaultLayout();
+      applyTheme(DEFAULT_THEME);
       persistView();
       applyLayoutToDom();
       buildBoard();
@@ -386,14 +434,17 @@
       api.syncMenuMode("fleet");
     }
 
-    function kpi(id, cat, horizon, value, color, hint) {
+    function kpi(id, cat, horizon, value, color, hint, opts) {
       const active =
         (id === "fleet" && !state.filter) ||
         (id !== "fleet" && state.filter === id);
+      const fixed = !!(opts && opts.fixed);
       const label = cat
         ? `<div class="lbl"><span class="lbl-cat">${cat}</span><span class="lbl-horizon">${horizon}</span></div>`
         : `<div class="lbl">${horizon}</div>`;
-      return `<div class="kpi clickable kpi-draggable${active ? " active" : ""}" data-kpi="${id}" draggable="true" role="button" tabindex="0" aria-label="${cat ? cat + " " : ""}${horizon}">
+      const dragClass = fixed ? "kpi-fixed" : "kpi-draggable";
+      const dragAttr = fixed ? 'draggable="false"' : 'draggable="true"';
+      return `<div class="kpi clickable ${dragClass}${active ? " active" : ""}" data-kpi="${id}" ${dragAttr} role="button" tabindex="0" aria-label="${cat ? cat + " " : ""}${horizon}">
       ${label}
       <div class="num" style="color:${color}">${value}</div>
       <div class="hint">${hint || ""}</div>
@@ -563,14 +614,14 @@
       const clickHint = "Click to filter - drag to rearrange";
       function toneColor(id, n) {
         if (id.indexOf("overdue") >= 0) return n ? "var(--red)" : "var(--good)";
-        return n ? "var(--warn)" : "var(--brass)";
+        return n ? "var(--warn)" : "var(--good)";
       }
       const defById = {
         fleet: {
           cat: "",
           horizon: "Units",
           value: rows().length,
-          color: "var(--brass-bright)",
+          color: "var(--accent)",
           hint:
             counts["reg-overdue"] +
             " registration" +
@@ -650,21 +701,39 @@
       };
 
       state.layout.kpiOrder = normalizeKpiOrder(state.layout.kpiOrder);
+      applyTheme(state.layout.theme);
+
+      const unitsDef = defById.fleet;
+      const unitsHtml = kpi(
+        "fleet",
+        unitsDef.cat,
+        unitsDef.horizon,
+        unitsDef.value,
+        unitsDef.color,
+        unitsDef.hint,
+        { fixed: true }
+      );
+
       const visibleOrder = state.layout.kpiOrder.filter((id) => isKpiVisible(id));
       const cardsHtml = visibleOrder
         .map((id) => {
           const d = defById[id];
           if (!d) return "";
-          return kpi(id, d.cat, d.horizon, d.value, d.color, d.hint);
+          return kpi(id, d.cat, d.horizon, d.value, d.color, d.hint, { fixed: false });
         })
         .join("");
 
       $("kpis").innerHTML =
-        '<div class="kpi-strip" id="kpiStrip" aria-label="KPI cards - drag to rearrange">' +
+        '<div class="kpi-row-units" id="kpiUnitsRow" aria-label="Units">' +
+        unitsHtml +
+        "</div>" +
+        '<hr class="kpi-divider" aria-hidden="true" />' +
+        '<div class="kpi-strip" id="kpiStrip" aria-label="Horizon KPI cards - drag to rearrange">' +
         cardsHtml +
         "</div>";
 
       wireKpiInteractions();
+      wireUnitsClick();
 
       applyLayoutToDom();
       renderQueue();
@@ -672,8 +741,25 @@
       persistView();
     }
 
+    function wireUnitsClick() {
+      const row = $("kpiUnitsRow");
+      if (!row) return;
+      row.querySelectorAll(".kpi").forEach((el) => {
+        el.onclick = () => {
+          setFilter("");
+        };
+        el.onkeydown = (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            setFilter("");
+          }
+        };
+      });
+    }
+
     function reorderKpiOrder(dragId, beforeId) {
-      if (!dragId) return;
+      if (!dragId || dragId === "fleet") return;
+      if (beforeId === "fleet") beforeId = null;
       const order = normalizeKpiOrder(state.layout.kpiOrder).filter((id) => id !== dragId);
       let insertAt = order.length;
       if (beforeId) {
@@ -759,7 +845,7 @@
         else strip.appendChild(ph);
       }
 
-      strip.querySelectorAll(".kpi").forEach((el) => {
+      strip.querySelectorAll(".kpi.kpi-draggable").forEach((el) => {
         el.addEventListener("dragstart", (ev) => {
           dragId = el.dataset.kpi;
           didDrag = false;
@@ -1104,8 +1190,14 @@
     function syncLayoutPanel() {
       const panel = $("layoutPanel");
       if (!panel) return;
+      applyTheme(state.layout.theme);
       panel.querySelectorAll("[data-layout-kpi]").forEach((inp) => {
         const id = inp.getAttribute("data-layout-kpi");
+        if (id === "fleet") {
+          inp.checked = true;
+          inp.disabled = true;
+          return;
+        }
         inp.checked = !!state.layout.kpis[id];
       });
       panel.querySelectorAll("[data-layout-group]").forEach((inp) => {
@@ -1191,8 +1283,18 @@
     function onLayoutPanelChange(ev) {
       const t = ev.target;
       if (!t) return;
+      if (t.name === "layoutTheme" && t.checked) {
+        applyTheme(t.value);
+        persistView();
+        syncLayoutPanel();
+        return;
+      }
       if (t.hasAttribute("data-layout-kpi")) {
         const id = t.getAttribute("data-layout-kpi");
+        if (id === "fleet") {
+          t.checked = true;
+          return;
+        }
         state.layout.kpis[id] = !!t.checked;
         persistView();
         buildBoard();
@@ -1243,6 +1345,14 @@
       if ($("customizeBtn")) {
         $("customizeBtn").onclick = () => openLayoutPanel();
       }
+      if ($("themeSelect")) {
+        $("themeSelect").onchange = () => {
+          applyTheme($("themeSelect").value);
+          persistView();
+          syncLayoutPanel();
+        };
+      }
+      applyTheme(state.layout.theme || DEFAULT_THEME);
       if ($("layoutDoneBtn")) {
         $("layoutDoneBtn").onclick = () => closeLayoutPanel();
       }

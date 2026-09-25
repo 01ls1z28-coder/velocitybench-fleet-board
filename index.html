@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -94,13 +94,29 @@
             Auto-check
           </label>
           <button class="btn" type="button" id="refreshBtnFleet">Refresh</button>
+          <label class="theme-inline" title="Dashboard color theme">
+            Theme
+            <select id="themeSelect" class="theme-select" aria-label="Color theme">
+              <option value="dark">Dark</option>
+              <option value="dark-brass">Dark + Brass trim</option>
+              <option value="midnight">Midnight</option>
+              <option value="graphite">Graphite</option>
+              <option value="forest">Forest</option>
+              <option value="ocean">Ocean</option>
+              <option value="ember">Ember</option>
+              <option value="copper">Copper dusk</option>
+              <option value="plum">Plum</option>
+              <option value="high-contrast">High contrast</option>
+              <option value="soft-light">Soft light</option>
+            </select>
+          </label>
           <button class="btn board-only fleet-only" type="button" id="customizeBtn" title="Show or hide KPI cards, table columns, and due queue">Customize</button>
         </div>
       </div>
 
       <div class="mode-pill">
         <span class="pill accent">Fleet layout</span>
-        <span class="pill-hint">Inspection + registration horizons - drag cards to rearrange</span>
+        <span class="pill-hint">Units on top; drag horizon cards below to rearrange</span>
       </div>
 
       <div class="kpis" id="kpis"></div>
@@ -156,9 +172,26 @@
     </div>
     <div class="layout-panel-body">
       <section class="layout-section">
+        <h4>Theme</h4>
+        <p class="layout-hint">Pick a look. Brass trim is optional accents only. Status red / warn / good stay strong.</p>
+        <div class="theme-grid" id="themeGrid" role="radiogroup" aria-label="Color theme">
+          <label class="theme-option" data-theme-value="dark"><input type="radio" name="layoutTheme" value="dark" /> <span class="theme-swatch" style="--swatch-a:#0e1218;--swatch-b:#4cc9f0"></span> Dark</label>
+          <label class="theme-option" data-theme-value="dark-brass"><input type="radio" name="layoutTheme" value="dark-brass" /> <span class="theme-swatch" style="--swatch-a:#0e1218;--swatch-b:#c9a263"></span> Dark + Brass trim</label>
+          <label class="theme-option" data-theme-value="midnight"><input type="radio" name="layoutTheme" value="midnight" /> <span class="theme-swatch" style="--swatch-a:#10182a;--swatch-b:#7aa2ff"></span> Midnight</label>
+          <label class="theme-option" data-theme-value="graphite"><input type="radio" name="layoutTheme" value="graphite" /> <span class="theme-swatch" style="--swatch-a:#161618;--swatch-b:#b0b8c4"></span> Graphite</label>
+          <label class="theme-option" data-theme-value="forest"><input type="radio" name="layoutTheme" value="forest" /> <span class="theme-swatch" style="--swatch-a:#0e1811;--swatch-b:#5dce8a"></span> Forest</label>
+          <label class="theme-option" data-theme-value="ocean"><input type="radio" name="layoutTheme" value="ocean" /> <span class="theme-swatch" style="--swatch-a:#0c1620;--swatch-b:#3ec6e8"></span> Ocean</label>
+          <label class="theme-option" data-theme-value="ember"><input type="radio" name="layoutTheme" value="ember" /> <span class="theme-swatch" style="--swatch-a:#18100d;--swatch-b:#e8915a"></span> Ember</label>
+          <label class="theme-option" data-theme-value="copper"><input type="radio" name="layoutTheme" value="copper" /> <span class="theme-swatch" style="--swatch-a:#161310;--swatch-b:#d08a5a"></span> Copper dusk</label>
+          <label class="theme-option" data-theme-value="plum"><input type="radio" name="layoutTheme" value="plum" /> <span class="theme-swatch" style="--swatch-a:#171022;--swatch-b:#c084fc"></span> Plum</label>
+          <label class="theme-option" data-theme-value="high-contrast"><input type="radio" name="layoutTheme" value="high-contrast" /> <span class="theme-swatch" style="--swatch-a:#000;--swatch-b:#66d9ff"></span> High contrast</label>
+          <label class="theme-option" data-theme-value="soft-light"><input type="radio" name="layoutTheme" value="soft-light" /> <span class="theme-swatch" style="--swatch-a:#f3f5f8;--swatch-b:#1a8fb8"></span> Soft light</label>
+        </div>
+      </section>
+      <section class="layout-section">
         <h4>KPI cards</h4>
-        <p class="layout-hint">Drag cards on the board to reorder. They snap into the grid. Toggles below show or hide cards.</p>
-        <label class="layout-check"><input type="checkbox" data-layout-kpi="fleet" /> Units</label>
+        <p class="layout-hint">Units stays fixed on top. Drag horizon cards below the divider to reorder. Toggles show or hide metric cards.</p>
+        <p class="layout-hint">Units card: always visible (not draggable).</p>
         <div class="layout-group">
           <label class="layout-check layout-master"><input type="checkbox" data-layout-group="inspection" /> Inspection (all)</label>
           <div class="layout-sub">

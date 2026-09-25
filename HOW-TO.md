@@ -24,5 +24,5 @@ Your workbook is read only in this browser. Nothing is uploaded.
 
 ## Customize layout
 
-Click **Customize** (next to Refresh) to show or hide KPI cards, table columns, and the due queue. Drag KPI cards on the board to reorder; they snap into the grid. Choices (including order) save on this browser with your view. **Reset to defaults** restores the full layout and default card order.
+Click **Customize** (next to Refresh) to show or hide horizon KPI cards, table columns, and the due queue. Units stays fixed on top (not draggable). Drag horizon cards below the divider to reorder; they snap into the grid. Use **Theme** (near Customize or inside the panel) to pick Dark, Brass trim, Midnight, Graphite, Forest, Ocean, Ember, Copper, Plum, High contrast, or Soft light. Choices (including order + theme) save on this browser with your view under `dashboard-fleet-view-v1:`. **Reset to defaults** restores Dark theme, full layout, and default card order.
 

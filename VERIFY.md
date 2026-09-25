@@ -54,3 +54,8 @@ Click any fleet table `<th>` to sort visible/filtered rows. Same header toggles 
 ## 60-day + drag reorder + brass (2026-09-25)
 
 `insp-60` / `reg-60` inclusive horizons; unified KPI strip with drag-snap order in `kpiOrder`; brass chrome. Local-only / no Pages push. See `/workspace/dashboard-kpi-fix/KPI-60-DND.md`.
+
+
+## Theme + Units strip (2026-09-25)
+
+Default Dark (prior look). Optional Dark + Brass trim accents only. Theme picker in Customize + Theme select; persist `theme` with layout. Units fixed on top + divider; draggable strip excludes Units. Status red/warn/good clear in every theme. Local-only / no Pages push. See `/workspace/dashboard-kpi-fix/THEME-TRIM.md`.
