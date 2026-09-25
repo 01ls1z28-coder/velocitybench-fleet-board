@@ -1,16 +1,28 @@
-# Verify — KPI accuracy + Fleet-only
+# Verify — KPI boxes (Inspection + Registration) + Fleet-only
 
 ## KPI vs filter (sample-fleet.xlsx, today = 2026-09-25)
 
-| KPI / filter | Expected | Units (insp days) |
-|--------------|---------:|-------------------|
-| Units | 8 | all |
-| 90-day overdue | 2 | 108 (−7), 162 (−3) |
-| Due in 7 days | 2 | 130 (2), 122 (7) |
-| Due in 30 days | 4 | 130 (2), 122 (7), 155 (17), 101 (20) |
-| Registration overdue | 1 | 122 (reg −10) |
+Inclusive overlapping future horizons; overdue separate. Counts use the same `matchesFilter` predicates as the status dropdown.
 
-Root cause fixed: KPI buckets were mutually exclusive (`else if`), so 0–7 day units were excluded from the 30-day card while the filter included them.
+| KPI / filter key | Expected | Matching units |
+|------------------|---------:|----------------|
+| Units | 8 | all |
+| insp-overdue | 2 | 108 (−7), 162 (−3) |
+| insp-week | 2 | 130 (2), 122 (7) |
+| insp-30 | 4 | 130 (2), 122 (7), 155 (17), 101 (20) |
+| insp-90 | 6 | +114 (43), 141 (69) |
+| reg-overdue | 1 | 122 (reg −10) |
+| reg-week | 1 | 155 (reg 4) |
+| reg-30 | 2 | 155 (4), 108 (11) |
+| reg-90 | 4 | +130 (32), 162 (89) |
+| missing | 0 | — |
+
+## Layout
+
+- Row 1: Units card
+- Group **Inspection**: Overdue / 7 days / 30 days / 90 days
+- Group **Registration**: Overdue / 7 days / 30 days / 90 days
+- Labels legible (category + horizon); dark theme
 
 ## Fleet-only
 
@@ -19,6 +31,7 @@ Root cause fixed: KPI buckets were mutually exclusive (`else if`), so 0–7 day 
 
 ## Checks
 
-- [ ] KPI card number equals filtered table/queue length for overdue, 7d, 30d, Units
+- [ ] KPI card number equals filtered table/queue length for every key above
+- [ ] Queue title names Inspection vs Registration correctly when filtered
 - [ ] No "generic" controls in UI
-- [ ] Offline twins: ASCII max ord 126; no readable `http`/`https`/`www` in source
+- [ ] Offline twins: ASCII max ord 126; no CDN/`fetch(`/`script src=`; OOXML `http://schemas...` literals OK

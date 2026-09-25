@@ -204,15 +204,51 @@
       api.syncMenuMode("fleet");
     }
 
-    function kpi(id, label, value, color, hint) {
+    function kpi(id, cat, horizon, value, color, hint) {
       const active =
         (id === "fleet" && !state.filter) ||
         (id !== "fleet" && state.filter === id);
-      return `<div class="kpi clickable${active ? " active" : ""}" data-kpi="${id}" role="button" tabindex="0">
-      <div class="lbl">${label}</div>
+      const label = cat
+        ? `<div class="lbl"><span class="lbl-cat">${cat}</span><span class="lbl-horizon">${horizon}</span></div>`
+        : `<div class="lbl">${horizon}</div>`;
+      return `<div class="kpi clickable${active ? " active" : ""}" data-kpi="${id}" role="button" tabindex="0" aria-label="${cat ? cat + " " : ""}${horizon}">
+      ${label}
       <div class="num" style="color:${color}">${value}</div>
-      <div class="hint">${hint}</div>
+      <div class="hint">${hint || ""}</div>
     </div>`;
+    }
+
+    function filterTitle(filter) {
+      const map = {
+        "insp-overdue": "Inspection · Overdue",
+        "insp-week": "Inspection · 7 days",
+        "insp-30": "Inspection · 30 days",
+        "insp-90": "Inspection · 90 days",
+        "reg-overdue": "Registration · Overdue",
+        "reg-week": "Registration · 7 days",
+        "reg-30": "Registration · 30 days",
+        "reg-90": "Registration · 90 days",
+        missing: "Missing 90-day date"
+      };
+      return map[filter] || filter;
+    }
+
+    function isRegFilter(filter) {
+      return (
+        filter === "reg-overdue" ||
+        filter === "reg-week" ||
+        filter === "reg-30" ||
+        filter === "reg-90"
+      );
+    }
+
+    function isInspFilter(filter) {
+      return (
+        filter === "insp-overdue" ||
+        filter === "insp-week" ||
+        filter === "insp-30" ||
+        filter === "insp-90"
+      );
     }
 
     function matchesFilter(r, filter) {
@@ -222,7 +258,11 @@
       if (filter === "insp-overdue") return !!(insp && insp.n < 0);
       if (filter === "insp-week") return !!(insp && insp.n >= 0 && insp.n <= 7);
       if (filter === "insp-30") return !!(insp && insp.n >= 0 && insp.n <= 30);
+      if (filter === "insp-90") return !!(insp && insp.n >= 0 && insp.n <= 90);
       if (filter === "reg-overdue") return !!(reg && reg.n < 0);
+      if (filter === "reg-week") return !!(reg && reg.n >= 0 && reg.n <= 7);
+      if (filter === "reg-30") return !!(reg && reg.n >= 0 && reg.n <= 30);
+      if (filter === "reg-90") return !!(reg && reg.n >= 0 && reg.n <= 90);
       if (filter === "missing") return !insp;
       return true;
     }
@@ -252,53 +292,49 @@
     }
 
     function renderQueue() {
+      const useReg = isRegFilter(state.filter);
       const queue = [];
       rows().forEach((r, idx) => {
         if (!matchesFilter(r, state.filter)) return;
         const insp = inspInfo(r);
-        if (!insp) return;
-        /* when no bucket filter, keep 45-day queue spirit; when filtered, show matching with dates */
-        if (!state.filter && insp.n > 45) return;
-        if (state.filter === "insp-overdue" || state.filter === "insp-week" || state.filter === "insp-30") {
-          queue.push({ idx, r, insp });
-        } else if (!state.filter) {
-          queue.push({ idx, r, insp });
-        } else if (insp) {
-          queue.push({ idx, r, insp });
-        }
+        const reg = regInfo(r);
+        const info = useReg ? reg : insp;
+        if (!info) return;
+        /* default queue: inspections in next 45 days; filtered: matching horizon */
+        if (!state.filter && info.n > 45) return;
+        queue.push({ idx, r, info, kind: useReg ? "reg" : "insp" });
       });
-      queue.sort((a, b) => a.insp.n - b.insp.n);
+      queue.sort((a, b) => a.info.n - b.info.n);
 
-      const titleHint = state.filter
-        ? ` · filtered: ${
-            state.filter === "insp-overdue"
-              ? "overdue"
-              : state.filter === "insp-week"
-                ? "7 days"
-                : state.filter === "insp-30"
-                  ? "30 days"
-                  : state.filter
-          }`
-        : "";
       const h3 = $("dueList").parentElement.querySelector("h3");
-      if (h3) h3.textContent = "90-day inspection queue" + titleHint;
+      if (h3) {
+        if (!state.filter) {
+          h3.textContent = "90-day inspection queue";
+        } else if (useReg) {
+          h3.textContent = "Registration queue · filtered: " + filterTitle(state.filter);
+        } else if (isInspFilter(state.filter)) {
+          h3.textContent = "Inspection queue · filtered: " + filterTitle(state.filter);
+        } else {
+          h3.textContent = "Queue · filtered: " + filterTitle(state.filter);
+        }
+      }
 
       $("dueList").innerHTML =
         queue
           .slice(0, 12)
           .map(
-            ({ idx, r, insp }) => `
+            ({ idx, r, info }) => `
         <div class="q-item" data-idx="${idx}">
-          <div class="days ${tone(insp.n)}">${
-            insp.n < 0 ? "OVERDUE" : insp.n + "d"
+          <div class="days ${tone(info.n)}">${
+            info.n < 0 ? "OVERDUE" : info.n + "d"
           }</div>
           <div>
             <b>Unit ${escapeHtml(String(val(r, "id") || "—"))}</b>
             <div class="meta">${escapeHtml(String(val(r, "make") || ""))}</div>
           </div>
           <div class="meta">${escapeHtml(String(val(r, "driver") || "No driver"))}</div>
-          <div class="meta">${insp.date.toLocaleDateString()}<br>${daysLabel(
-              insp.n
+          <div class="meta">${info.date.toLocaleDateString()}<br>${daysLabel(
+              info.n
             )}</div>
         </div>`
           )
@@ -324,55 +360,69 @@
 
       /* KPI counts MUST match matchesFilter / statusFilter predicates so card
          numbers equal the filtered list length. Future horizons are inclusive
-         and overlapping (7-day is a subset of 30-day); overdue is separate. */
-      let overdue = 0,
-        week = 0,
-        thirty = 0,
-        missing = 0,
-        regOver = 0;
+         and overlapping (7-day subset of 30-day subset of 90-day); overdue separate. */
+      const counts = {
+        "insp-overdue": 0,
+        "insp-week": 0,
+        "insp-30": 0,
+        "insp-90": 0,
+        "reg-overdue": 0,
+        "reg-week": 0,
+        "reg-30": 0,
+        "reg-90": 0,
+        missing: 0
+      };
       rows().forEach((r) => {
-        const insp = inspInfo(r);
-        if (!insp) missing += 1;
-        if (matchesFilter(r, "insp-overdue")) overdue += 1;
-        if (matchesFilter(r, "insp-week")) week += 1;
-        if (matchesFilter(r, "insp-30")) thirty += 1;
-        if (matchesFilter(r, "reg-overdue")) regOver += 1;
+        if (!inspInfo(r)) counts.missing += 1;
+        Object.keys(counts).forEach((k) => {
+          if (k === "missing") return;
+          if (matchesFilter(r, k)) counts[k] += 1;
+        });
       });
 
-      $("kpis").innerHTML = [
+      const clickHint = "Click to filter";
+      const inspCards = [
+        kpi("insp-overdue", "Inspection", "Overdue", counts["insp-overdue"], counts["insp-overdue"] ? "var(--red)" : "var(--good)", clickHint),
+        kpi("insp-week", "Inspection", "7 days", counts["insp-week"], counts["insp-week"] ? "var(--warn)" : "var(--accent)", clickHint),
+        kpi("insp-30", "Inspection", "30 days", counts["insp-30"], counts["insp-30"] ? "var(--warn)" : "var(--accent)", clickHint),
+        kpi("insp-90", "Inspection", "90 days", counts["insp-90"], counts["insp-90"] ? "var(--warn)" : "var(--accent)", clickHint)
+      ].join("");
+      const regCards = [
+        kpi("reg-overdue", "Registration", "Overdue", counts["reg-overdue"], counts["reg-overdue"] ? "var(--red)" : "var(--good)", clickHint),
+        kpi("reg-week", "Registration", "7 days", counts["reg-week"], counts["reg-week"] ? "var(--warn)" : "var(--accent)", clickHint),
+        kpi("reg-30", "Registration", "30 days", counts["reg-30"], counts["reg-30"] ? "var(--warn)" : "var(--accent)", clickHint),
+        kpi("reg-90", "Registration", "90 days", counts["reg-90"], counts["reg-90"] ? "var(--warn)" : "var(--accent)", clickHint)
+      ].join("");
+
+      $("kpis").innerHTML =
+        `<div class="kpi-row kpi-row-units">` +
         kpi(
           "fleet",
+          "",
           "Units",
           rows().length,
           "var(--soft)",
-          `${regOver} registration${regOver === 1 ? "" : "s"} overdue · click = all`
-        ),
-        kpi(
-          "insp-overdue",
-          "90-day overdue",
-          overdue,
-          overdue ? "var(--red)" : "var(--good)",
-          "Click to filter queue + table"
-        ),
-        kpi(
-          "insp-week",
-          "Due in 7 days",
-          week,
-          week ? "var(--warn)" : "var(--accent)",
-          "Click to filter queue + table"
-        ),
-        kpi(
-          "insp-30",
-          "Due in 30 days",
-          thirty,
-          thirty ? "var(--warn)" : "var(--accent)",
-          "Click to filter queue + table"
-        )
-      ].join("");
+          `${counts["reg-overdue"]} registration${counts["reg-overdue"] === 1 ? "" : "s"} overdue · click = all`
+        ) +
+        `</div>` +
+        `<div class="kpi-group" data-group="inspection">` +
+        `<div class="kpi-group-label">Inspection</div>` +
+        `<div class="kpi-group-grid">${inspCards}</div>` +
+        `</div>` +
+        `<div class="kpi-group" data-group="registration">` +
+        `<div class="kpi-group-label">Registration</div>` +
+        `<div class="kpi-group-grid">${regCards}</div>` +
+        `</div>`;
       $("kpis").querySelectorAll(".kpi").forEach((el) => {
         el.onclick = () => {
           const id = el.dataset.kpi;
           setFilter(id === "fleet" ? "" : id);
+        };
+        el.onkeydown = (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            el.click();
+          }
         };
       });
 

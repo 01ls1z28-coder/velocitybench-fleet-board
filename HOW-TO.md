@@ -8,16 +8,15 @@
 
 ## KPI cards = filter lists
 
-Each card count uses the **same rule** as its filter:
+Each card count uses the **same rule** as its filter. Future horizons overlap (7 ⊂ 30 ⊂ 90). Overdue is separate.
 
 | Card | Rule |
 |------|------|
 | Units | All rows |
-| 90-day overdue | Inspection date before today |
-| Due in 7 days | Inspection due today through +7 days (inclusive) |
-| Due in 30 days | Inspection due today through +30 days (inclusive) |
-
-7-day units are also counted in 30-day (overlapping horizons). Overdue is separate.
+| Inspection · Overdue | Inspection date before today |
+| Inspection · 7 / 30 / 90 days | Inspection due today through +N days (inclusive) |
+| Registration · Overdue | Registration date before today |
+| Registration · 7 / 30 / 90 days | Registration due today through +N days (inclusive) |
 
 ## Privacy
 
