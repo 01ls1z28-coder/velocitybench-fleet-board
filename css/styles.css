@@ -1075,7 +1075,11 @@ html, body {
   cursor: pointer;
 }
 
-.kpi.dragging,
+.kpi.dragging {
+  opacity: 0.35;
+}
+
+/* Applied after dragstart via setTimeout so native DnD is not cancelled. */
 .kpi.drag-ghost {
   opacity: 0.35;
   pointer-events: none;

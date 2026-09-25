@@ -1170,20 +1170,13 @@
             return;
           }
           didDrag = false;
+          /* Opacity only during dragstart. pointer-events:none on .drag-ghost
+             is deferred - applying it here cancels Chromium native DnD. */
           el.classList.add("dragging");
           strip.classList.add("is-dragging");
           try {
             ev.dataTransfer.effectAllowed = "move";
             ev.dataTransfer.setData("text/plain", dragId);
-            /* Center drag image on cursor so ghost aligns with drop aim. */
-            if (typeof ev.dataTransfer.setDragImage === "function") {
-              const r = el.getBoundingClientRect();
-              ev.dataTransfer.setDragImage(
-                el,
-                Math.max(0, Math.round(ev.clientX - r.left)),
-                Math.max(0, Math.round(ev.clientY - r.top))
-              );
-            }
           } catch (_) {
             /* Edge file:// */
           }
